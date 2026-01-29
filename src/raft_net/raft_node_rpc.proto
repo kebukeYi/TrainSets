@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package RaftNodeRpcProtoc;
+
+// Leader 下发 日志条目有关;
+message LogEntry{
+  // 指令: set key val; get val;
+  bytes Command = 1;
+  int64 LogIndex = 2;
+  int64  LogTerm = 3;
+}
+message AppendEntriesArgs{
+  int64 CurTerm = 1;
+  int64 LeaderId = 2;
+  int64 PrevLogIndex = 3;
+  int64 PrevLogTerm = 4;
+  repeated LogEntry Entries = 5;
+  int64 LeaderCommitIndex = 6;
+}
+message AppendEntriesReply{
+  // leader的term可能是与Follower不同的;
+  int64 Term = 1;
+  // 可快速调整leader对应的nextIndex;
+  int64 NextIndex = 2;
+  bool Success = 3;
+  int64 NodeState = 4;
+}
+
+// 候选者节点之间拉票相关
+message RequestVoteArgs{
+  int64 Term = 1;
+  int64 CandidateId = 2;
+  int64 LastLogIndex = 3;
+  int64 LastLogTerm = 4;
+}
+message RequestVoteReply{
+  int64 Term = 1;
+  bool VoteGranted = 2;
+  int64 VoteState = 3;
+}
+
+message InstallSnapshotArgs{
+  int64 Term = 1;
+  int64 LeaderId = 2;
+  int64 LastIncludedIndex = 4;
+  int64 LastIncludedTerm = 5;
+  bytes Snapshot = 6;
+}
+message InstallSnapshotReply{
+  int64 Term = 1;
+  bool Success = 2;
+}
+
+// node 和 node 之间的通信
+service RaftNodeRpc{
+  rpc RequestVote(RequestVoteArgs) returns (RequestVoteReply);
+  rpc AppendEntries(AppendEntriesArgs) returns (AppendEntriesReply);
+  rpc InstallSnapshot(InstallSnapshotArgs) returns (InstallSnapshotReply);
+}
+
+
+

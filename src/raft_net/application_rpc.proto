@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package ApplicationRpcProto;
+
+message CommandArgs {
+  // 指令: set key val; get val;
+  bytes command = 1;
+  bytes ClientId = 2;
+  bytes SeqId = 3;
+}
+
+message CommandReply{
+  //	下面几个参数和论文中相同
+  bytes Err = 1;
+  bytes Value = 2;
+}
+
+// client 和 node 之间的网络调用;
+service ApplicationRpc {
+  rpc Cmd(CommandArgs) returns (CommandReply);
+}
