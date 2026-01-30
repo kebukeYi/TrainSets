@@ -9,7 +9,7 @@ class StateMachine {
 public:
     struct Result {
         int Code;
-        int64 Index;
+        int64_t Index;
         std::string Value;
         std::string Error;
     };

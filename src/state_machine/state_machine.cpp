@@ -3,11 +3,11 @@
 //
 #include "state_machine.h"
 
-class TrainSet : public StateMachine {
+class StateMachineImpl : public StateMachine {
 public:
-    TrainSet();
+    StateMachineImpl();
 
-    ~TrainSet();
+    ~StateMachineImpl();
 
     Result Cmd(const std::string &cmd) {
         return Result{};
