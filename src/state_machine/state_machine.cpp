@@ -3,13 +3,6 @@
 //
 #include "state_machine.h"
 
-class StateMachineImpl : public StateMachine {
-public:
-    StateMachineImpl();
-
-    ~StateMachineImpl();
-
-    Result Cmd(const std::string &cmd) {
-        return Result{};
-    };
-};
+StateMachine::Result StateMachine::Cmd(const std::string &cmd) {
+    return StateMachine::Result();
+}
