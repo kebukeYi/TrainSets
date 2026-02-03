@@ -8,14 +8,15 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
+
 #include "config.h"
 #include "monsoon.h"
 #include "apply_msg.h"
 #include "util.h"
 #include "persisted.h"
 #include "raft_node_rpc_util.h"
-#include "node_rpc.pb.h"
-#include "node_rpc.grpc.pb.h"
+#include "raft_node_rpc.pb.h"
+#include "raft_node_rpc.grpc.pb.h"
 
 class Raft : public RaftNodeRpcProtoc::RaftNodeRpc::Service {
 private:
@@ -70,14 +71,16 @@ private:
     };
 
 public:
-    Raft();
+    Raft()=default;
 
-    ~Raft();
+    ~Raft()=default;
 
     void init(int me, std::vector<std::shared_ptr<RaftNodeRpcUtil>> peers, std::shared_ptr<Persisted> persist,
               std::shared_ptr<LockQueue<ApplyMsg>> applyChan);
 
     void Start(Op op, int64_t *logIndex, int64_t *logTerm, bool *isLeader);
+
+    void close();
 
 public:
     void electionTicker();

@@ -2,15 +2,15 @@ syntax = "proto3";
 
 package ApplicationRpcProto;
 
+// protoc --cpp_out=. --grpc_out=. --plugin=protoc-gen-grpc=`which grpc_cpp_plugin` application_rpc.proto
 message CommandArgs {
+  int64 ClientId = 1;
+  int64 SeqId = 2;
   // 指令: set key val; get val;
-  bytes command = 1;
-  bytes ClientId = 2;
-  bytes SeqId = 3;
+  bytes Command = 3;
 }
 
 message CommandReply{
-  //	下面几个参数和论文中相同
   bytes Err = 1;
   bytes Value = 2;
 }

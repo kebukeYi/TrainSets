@@ -1,13 +1,13 @@
 //
 // Created by 19327 on 2026/01/31/星期六.
 //
-
 #include "raft_node_rpc_util.h"
 
 RaftNodeRpcUtil::RaftNodeRpcUtil(std::string ip, short port) {
     std::string server_address{ip + ":" + std::to_string(port)};
     auto channel = grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials());
-    stub = std::move(RaftNodeRpcProtoc::RaftNodeRpc::NewStub(channel));
+    printf("RaftNodeRpcUtil.NewStub: %s\n", server_address.c_str());
+    stub = std::move(RaftNodeRpcProtoc::RaftNodeRpc::NewStub(channel,grpc::StubOptions()));
 }
 grpc::Status RaftNodeRpcUtil::CallRequestVote(RaftNodeRpcProtoc::RequestVoteArgs *args,
                                       RaftNodeRpcProtoc::RequestVoteReply *reply) {

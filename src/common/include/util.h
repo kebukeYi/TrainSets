@@ -1,9 +1,12 @@
 //
 // Created by 19327 on 2026/01/30/星期五.
 //
-
 #pragma once
-
+#include <chrono>
+#include <unistd.h>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/serialization/access.hpp>
 #include <string>
 #include <mutex>
 #include <condition_variable>
@@ -11,18 +14,30 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <thread>
+#include <cstdio>
+#include <cstdarg>
+#include <iostream>
+#include <cstdint>
 
 void DPrintf(const char *format...);
 
-void myAssert(bool condition, std::string message) {
-    if (!condition) {
-        std::cerr << "Error: " << message << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-}
+void myAssert(bool condition, std::string message);
 
-template <typename... Args>
-std::string format(const char* format_str, Args... args) {
+std::chrono::system_clock::time_point now();
+
+int64_t randInt63();
+
+std::chrono::milliseconds getRandomizedElectionTimeout();
+
+long long getRandomTimeout();
+
+void sleepForNMilliseconds(long long N);
+
+bool isReleasePort(unsigned short port);
+
+template<typename... Args>
+std::string format(const char *format_str, Args... args) {
     int size_s = std::snprintf(nullptr, 0, format_str, args...) + 1;  // "\0"
     if (size_s <= 0) {
         throw std::runtime_error("Error during formatting.");
@@ -32,7 +47,6 @@ std::string format(const char* format_str, Args... args) {
     std::snprintf(buf.data(), size, format_str, args...);
     return std::string(buf.data(), buf.data() + size - 1);  // remove '\0'
 }
-
 
 
 template<class T>
@@ -79,46 +93,47 @@ public:
 };
 
 class Op {
-private:
+public:
     int64_t clientId;
     int64_t seqId;
     std::string command;
+    std::string value;
+    std::string err;
 public:
     std::string toString() {
-        return "clientId:" + std::to_string(clientId) + ", seqId:" + std::to_string(seqId) + ", command:" + command;
+        std::stringstream sa;
+        boost::archive::text_oarchive oa(sa);
+        oa << *this;
+        return sa.str();
     }
 
     bool parseFromString(const std::string &str) {
-        clientId = std::stoll(str.substr(0, str.find(",")));
-        seqId = std::stoll(str.substr(str.find(",") + 1, str.find(",", str.find(",") + 1) - str.find(",") - 1));
-        command = str.substr(str.find_last_of(",") + 1);
+        std::stringstream sa(str);
+        boost::archive::text_iarchive ia(sa);
+        ia >> *this;
         return true;
     }
-};
 
-std::chrono::system_clock::time_point now() {
-    return std::chrono::system_clock::now();
-}
-
-std::chrono::milliseconds getRandomizedElectionTimeout() {
-    return std::chrono::milliseconds(rand() % 150 + 150);
-};
-
-void sleepForNMilliseconds(int N) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(N));
-}
-
-bool isReleasePort(unsigned short port) {
-    int s = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-    sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(port);
-    int ret = bind(s, (sockaddr *) &addr, sizeof(addr));
-    if (ret != 0) {
-        close(s);
-        return false;
+public:
+    friend std::ostream &operator<<(std::ostream &os, const Op &obj) {
+        os << "Op(clientId=" << obj.clientId << ", seqId=" << obj.seqId << ", command=" << obj.command << ", value="
+           << obj.value << ", err=" << obj.err << ")";
+        return os;
     }
-    close(s);
-    return true;
-}
+
+private:
+    // 友元类
+    friend class boost::serialization::access;
+    template <class Archive>
+    void serialize(Archive& ar, const unsigned int version) {
+        ar & clientId;
+        ar & seqId;
+        ar & command;
+        ar & value;
+        ar & err;
+    }
+};
+
+const std::string OK = "OK";
+const std::string ErrNoKey = "ErrNoKey";
+const std::string ErrWrongLeader = "ErrWrongLeader";

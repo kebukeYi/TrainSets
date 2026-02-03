@@ -28,6 +28,7 @@
 
 namespace ApplicationRpcProto {
 
+// client 和 node 之间的网络调用;
 class ApplicationRpc final {
  public:
   static constexpr char const* service_full_name() {

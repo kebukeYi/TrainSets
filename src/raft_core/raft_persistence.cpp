@@ -1,11 +1,10 @@
 //
 // Created by 19327 on 2026/01/30/星期五.
 //
-
 #include "raft.h"
 
 void Raft::persistRaftState() {
-    auto data=doPersistRaftState();
+    auto data = doPersistRaftState();
     persist_->SaveRaftState(data);
 }
 
@@ -15,9 +14,9 @@ std::string Raft::doPersistRaftState() {
     node.votedFor = votedFor;
     node.snapshotIndex = snapshotIndex;
     node.snapshotTerm = snapshotTerm;
-    for (int i = 0; i < logs.size(); ++i) {
+    for (auto &log: logs) {
         // protoc.SerializeAsString()
-        node.logs.push_back(logs[i].SerializeAsString());
+        node.logs.push_back(log.SerializeAsString());
     }
     std::stringstream sa;
     boost::archive::text_oarchive oa(sa);
@@ -25,11 +24,11 @@ std::string Raft::doPersistRaftState() {
     return sa.str();
 }
 
-void Raft::readPersistRaftState(std::string &data){
-    if (data.empty()){
+void Raft::readPersistRaftState(std::string &data) {
+    if (data.empty()) {
         return;
     }
-    std::stringstream  sin(data);
+    std::stringstream sin(data);
     boost::archive::text_iarchive ia(sin);
     BoostPersistRaftNode node;
     ia >> node;

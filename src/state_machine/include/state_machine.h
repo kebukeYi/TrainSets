@@ -3,21 +3,37 @@
 //
 #pragma once
 #include <string>
+#include "kv.h"
+#include "aof.h"
+#include "rdb.h"
+#include "resp.h"
 
 class StateMachine {
 private:
-
+    KVStorage g_store;
+    AOFManager g_aof;
+    RespParser respParser;
+    RDBManager g_rdb;
+    ServerConfig serverConfig;
 public:
     struct Result {
-        int Code;
-        int64_t Index;
         std::string Value;
         std::string Error;
     };
 
-    StateMachine();
+    StateMachine(const std::string &conf_path);
 
-    ~StateMachine() = default;
+    ~StateMachine();
+
+    bool init();
 
     Result Cmd(const std::string &cmd);
+
+    std::string handle_cmd(const RespValue &r, const std::string *raw);
+
+    std::string genSnapshot();
+
+    bool parseSnapshot(const std::string &snapshot);
+
+    void close();
 };

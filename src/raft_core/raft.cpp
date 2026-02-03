@@ -3,22 +3,30 @@
 //
 #include "raft.h"
 
+#include <utility>
+
 
 void Raft::init(int me, std::vector<std::shared_ptr<RaftNodeRpcUtil>> peers,
                 std::shared_ptr<Persisted> persist,
                 std::shared_ptr<LockQueue<ApplyMsg>> applyCh) {
-    me = me;
-    peers = peers;
-    persist_ = persist;
-    applyChan = applyCh;
+    DPrintf("[func-init-rf{%d}]  init raft node", me);
+    this->me = me;
+    this->peers = peers;
+    isStop.store(false);
+    mtx.lock();
 
-    currentTerm = -1;
-    votedFor = -1;
+    persist_ = std::move(persist);
+    applyChan = std::move(applyCh);
+
+    currentTerm = 1;
+    votedFor = -1; // -1 means vote for none;
     logs.clear();
-    snapshotIndex = -1;
-    snapshotTerm = -1;
-    commitIndex = -1;
-    lastAppliedIndex = -1;
+    snapshotIndex = 0;
+    snapshotTerm = 0;
+    commitIndex = 0;
+    lastAppliedIndex = 0;
+    nextIndex.resize(peers.size());
+    matchIndex.resize(peers.size());
     for (int i = 0; i < peers.size(); ++i) {
         nextIndex[i] = 0;
         matchIndex[i] = 0;
@@ -26,23 +34,30 @@ void Raft::init(int me, std::vector<std::shared_ptr<RaftNodeRpcUtil>> peers,
     role = Role::Follower;
     electionResetTime = now();
     heartbeatResetTime = now();
-    ioManager = std::make_unique<monsoon::IOManager>(fiberThreadPoolSize, fiberUseCallerThread);
 
+    printf("RaftNode-%d LoadRaftState...\n", me);
     auto data = persist_->LoadRaftState();
     readPersistRaftState(data);
+    printf("RaftNode-%d LoadRaftState.over: term %ld, votedFor %ld, logs.size: %ld, snapshotIndex %ld, snapshotTerm %ld, commitIndex %ld, lastAppliedIndex %ld\n",
+           me, currentTerm, votedFor, logs.size(), snapshotIndex, snapshotTerm, commitIndex, lastAppliedIndex);
     if (snapshotIndex > 0) {
         lastAppliedIndex = snapshotIndex;
     }
-    DPrintf("RaftNode-%d init: term %d, votedFor %d, logs.size: %d, snapshotIndex %d, snapshotTerm %d, commitIndex %d, lastAppliedIndex %d",
-            me, currentTerm, votedFor, logs.size(), snapshotIndex, snapshotTerm, commitIndex, lastAppliedIndex);
+
+    mtx.unlock();
+
+    ioManager = std::make_unique<monsoon::IOManager>(fiberThreadPoolSize, fiberUseCallerThread);
+
     ioManager->scheduler([this]() {
         electionTicker();
     });
+
     ioManager->scheduler([this]() {
         replicationTicker();
     });
 
-    std::thread t3(&Raft::replicationTicker, this);
+    printf("RaftNode-%d start applyTicker \n", me);
+    std::thread t3(&Raft::applyTicker, this);
     t3.detach();
 }
 
@@ -75,6 +90,13 @@ void Raft::getStateForCli(int64_t *term, bool *isLeader) {
     *isLeader = (role == Role::Leader);
 }
 
+void Raft::close(){
+    DPrintf("[func-close-rf{%d}]  close raft node", me);
+    ioManager->stop();
+    ioManager = nullptr;
+    isStop.store(true);
+    DPrintf("[func-close-rf{%d}]  raft node closed", me);
+}
 
 
 

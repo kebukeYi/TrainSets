@@ -14,11 +14,12 @@ void Raft::replicationTicker() {
         {
             mtx.lock();
             wakeTime = now();
+            // 这一次的合适的 睡眠时间;
             suitableSleepTime = getRandomizedElectionTimeout() + heartbeatResetTime - wakeTime;
             mtx.unlock();
         }
 
-        if (std::chrono::duration<double, std::milli>(suitableSleepTime).count() >1) {
+        if (std::chrono::duration<double, std::milli>(suitableSleepTime).count() > 1) {
             // 获取当前时间点
             auto start = std::chrono::steady_clock::now();
 
@@ -32,18 +33,20 @@ void Raft::replicationTicker() {
 
             // 使用ANSI控制序列将输出颜色修改为紫色
             std::cout << "\033[1;35m electionTimeOutTicker();函数设置睡眠时间为: "
-                      << std::chrono::duration_cast<std::chrono::milliseconds>(suitableSleepTime).count() << " 毫秒\033[0m"
+                      << std::chrono::duration_cast<std::chrono::milliseconds>(suitableSleepTime).count()
+                      << " 毫秒\033[0m"
                       << std::endl;
             std::cout << "\033[1;35m electionTimeOutTicker();函数实际睡眠时间为: " << duration.count() << " 毫秒\033[0m"
                       << std::endl;
         }
 
         if (std::chrono::duration<double, std::milli>(heartbeatResetTime - wakeTime).count() > 0) {
-            // 说明睡眠的这段时间有重置定时器，那么就没有超时，再次睡眠
+            // 说明睡眠的这段时间有重置定时器，那么就没有超时，再次睡眠;
             continue;
         }
 
         // 时间到了, 进行下发日志;
+        printf("[func-Raft::replicationTicker-raft{%d}] 时间到了, 进行下发日志;", me);
         doReplication();
     }
 };
@@ -87,10 +90,11 @@ void Raft::doReplication() {
             int64_t lastLogIndex = getLastLogIndex();
             // leader对每个节点发送的日志长短不一，但是都保证从prevIndex发送直到最后
             myAssert(appendEntriesArgs->prevlogindex() + appendEntriesArgs->entries_size() == lastLogIndex,
-                     format("appendEntriesArgs.PrevLogIndex{%d}+len(appendEntriesArgs.Entries){%d} != lastLogIndex{%d}",
+                     format("appendEntriesArgs.PrevLogIndex{%d}+len(appendEntriesArgs.Entries){%ld} != lastLogIndex{%ld}",
                             appendEntriesArgs->prevlogindex(), appendEntriesArgs->entries_size(), lastLogIndex));
 
-            DPrintf("[func-Raft::doReplication-raft{%d}] leader 向节点{%d}发送AE rpc，args->entries_size():{%d}", me, i, appendEntriesArgs->entries_size());
+            DPrintf("[func-Raft::doReplication-raft{%d}] leader 向节点{%d}发送AE rpc，args->entries_size():{%d}", me, i,
+                    appendEntriesArgs->entries_size());
             std::thread t1(&Raft::sendAppendEntries, this, i, appendEntriesArgs, reply, nodeNums);
             t1.detach();
         }
@@ -101,7 +105,9 @@ void Raft::doReplication() {
 bool Raft::sendAppendEntries(int server, std::shared_ptr<RaftNodeRpcProtoc::AppendEntriesArgs> args,
                              std::shared_ptr<RaftNodeRpcProtoc::AppendEntriesReply> reply,
                              std::shared_ptr<int> nodeNums) {
-    DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc開始 ， args->entries_size():{%d}",me, server, args->entries_size());
+
+    DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc開始 ， args->entries_size():{%d}", me,
+            server, args->entries_size());
     auto status = peers[server]->CallAppendEntries(args.get(), reply.get());
     if (!status.ok()) {
         DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc失败", me, server);
@@ -142,7 +148,8 @@ bool Raft::sendAppendEntries(int server, std::shared_ptr<RaftNodeRpcProtoc::Appe
         if (nextPrevLogIndex >= snapshotIndex) {
             nextPrevTerm = logs[getLogicLogIndex(nextPrevLogIndex)].logterm();
         }
-        DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc失败，nextIndex{%d} -> {%d}",me, server, nextPrevLogIndex, nextPrevTerm);
+        DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc失败，nextIndex{%d} -> {%d}", me,
+                server, nextPrevLogIndex, nextPrevTerm);
         return false;
     } else {
         DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc成功", me, server);
@@ -174,22 +181,28 @@ grpc::Status Raft::AppendEntries(grpc::ServerContext *context, const RaftNodeRpc
         // 直接返回自己的大term;
         return grpc::Status::OK;
     }
+
     if (request->curterm() > currentTerm) {
         role = Raft::Follower;
+        currentTerm = request->curterm();
+        votedFor = -1;
     }
+    //
     role = Raft::Follower;
     electionResetTime = now();
+
     // 0任期 size()索引
     if (request->prevlogindex() > getLastLogIndex()) {
         response->set_term(InvalidTerm); // 日志过短;
         response->set_nextindex(getLastLogIndex() + 1);
         return grpc::Status::OK;
     }
+
     // 快照任期 快照索引
     // 这种情况会发生吗?
     // 既然follower节点的快照索引有值,那么说明之前leader下发过快照;
     // 前提leader下发快照, 那么就说明这部分数据已经被大多数提交了,
-    if (request->prevlogindex() < snapshotIndex) {
+    if (snapshotIndex > request->prevlogindex()) {
         response->set_term(snapshotTerm); // 日志过短;
         response->set_nextindex(snapshotIndex);
         return grpc::Status::OK;
@@ -203,8 +216,7 @@ grpc::Status Raft::AppendEntries(grpc::ServerContext *context, const RaftNodeRpc
         // 3. leader如何处理?
         for (int i = 0; i < request->entries_size(); ++i) {
             auto log = request->entries(i);
-            if (request->entries(i).logindex() > getLastLogIndex()) {
-                // logs.emplace_back(request->entries(i));
+            if (log.logindex() > getLastLogIndex()) {
                 logs.push_back(log);
             } else {
                 // 有可能是重复的数据;
@@ -226,14 +238,18 @@ grpc::Status Raft::AppendEntries(grpc::ServerContext *context, const RaftNodeRpc
             }
         }
 
-        if(request->leadercommitindex() > commitIndex){
+        if (request->leadercommitindex() > commitIndex) {
             commitIndex = std::min(request->leadercommitindex(), getLastLogIndex());
         }
+
         myAssert(getLastLogIndex() >= request->prevlogindex() + request->entries_size(),
                  format("[func-AppendEntries1-rf{%d}]rf.getLastLogIndex(){%d} != args.PrevLogIndex{%d}+len(args.Entries){%d}",
                         me, getLastLogIndex(), request->prevlogindex(), request->entries_size()));
+
+        electionResetTime = now();
         response->set_success(true);
     } else {
+        // 前一个 日志不匹配
         auto confilictTerm = logs[getLogicLogIndex(request->prevlogindex())].logterm();
         response->set_term(confilictTerm);
         auto confilictIndex = getFirstLogIndex(confilictTerm);

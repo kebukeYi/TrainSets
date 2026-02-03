@@ -2,10 +2,9 @@
 // Created by 19327 on 2026/01/30/星期五.
 //
 #pragma once
-
 #include <grpcpp/grpcpp.h>
-#include "node_rpc.pb.h"
-#include "node_rpc.grpc.pb.h"
+#include "raft_node_rpc.pb.h"
+#include "raft_node_rpc.grpc.pb.h"
 
 class RaftNodeRpcUtil {
 private:
@@ -14,7 +13,7 @@ private:
 public:
     RaftNodeRpcUtil(std::string address, short port);
 
-    ~RaftNodeRpcUtil();
+    ~RaftNodeRpcUtil()=default;
 
     grpc::Status CallAppendEntries(RaftNodeRpcProtoc::AppendEntriesArgs *args, RaftNodeRpcProtoc::AppendEntriesReply *reply);
 

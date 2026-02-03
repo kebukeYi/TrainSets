@@ -10,7 +10,7 @@ int64_t Raft::getFirstLogIndex(int64_t term) {
             return i + snapshotIndex;
         }
     }
-    return -1;
+    return InvalidIndex;
 }
 
 int64_t Raft::getNextCommandIndex() {

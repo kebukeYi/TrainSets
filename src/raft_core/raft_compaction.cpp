@@ -73,7 +73,12 @@ grpc::Status Raft::InstallSnapshot(grpc::ServerContext *context, const RaftNodeR
     } else {
         // 日志短了，全部清空;
         logs.clear();
+        auto log = RaftNodeRpcProtoc::LogEntry();
+        log.set_logindex(request->lastincludedindex());
+        log.set_logterm(request->lastincludedterm());
+        logs.emplace_back(log);
     }
+
     commitIndex = std::max(commitIndex, request->lastincludedindex());
     lastAppliedIndex = std::max(lastAppliedIndex, request->lastincludedindex());
     snapshotIndex = request->lastincludedindex();

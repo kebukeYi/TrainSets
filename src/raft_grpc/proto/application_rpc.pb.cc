@@ -62,12 +62,8 @@ inline constexpr CommandArgs::Impl_::Impl_(
         command_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        clientid_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        seqid_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()) {}
+        clientid_{::int64_t{0}},
+        seqid_{::int64_t{0}} {}
 
 template <typename>
 PROTOBUF_CONSTEXPR CommandArgs::CommandArgs(::_pbi::ConstantInitialized)
@@ -104,12 +100,12 @@ const ::uint32_t
         ~0u,  // no _inlined_string_donated_
         ~0u,  // no _split_
         ~0u,  // no sizeof(Split)
-        PROTOBUF_FIELD_OFFSET(::ApplicationRpcProto::CommandArgs, _impl_.command_),
         PROTOBUF_FIELD_OFFSET(::ApplicationRpcProto::CommandArgs, _impl_.clientid_),
         PROTOBUF_FIELD_OFFSET(::ApplicationRpcProto::CommandArgs, _impl_.seqid_),
-        0,
+        PROTOBUF_FIELD_OFFSET(::ApplicationRpcProto::CommandArgs, _impl_.command_),
         1,
         2,
+        0,
         PROTOBUF_FIELD_OFFSET(::ApplicationRpcProto::CommandReply, _impl_._has_bits_),
         PROTOBUF_FIELD_OFFSET(::ApplicationRpcProto::CommandReply, _internal_metadata_),
         ~0u,  // no _extensions_
@@ -136,8 +132,8 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
 const char descriptor_table_protodef_application_5frpc_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\025application_rpc.proto\022\023ApplicationRpcP"
-    "roto\"\?\n\013CommandArgs\022\017\n\007command\030\001 \001(\014\022\020\n\010"
-    "ClientId\030\002 \001(\014\022\r\n\005SeqId\030\003 \001(\014\"*\n\014Command"
+    "roto\"\?\n\013CommandArgs\022\020\n\010ClientId\030\001 \001(\003\022\r\n"
+    "\005SeqId\030\002 \001(\003\022\017\n\007Command\030\003 \001(\014\"*\n\014Command"
     "Reply\022\013\n\003Err\030\001 \001(\014\022\r\n\005Value\030\002 \001(\0142\\\n\016App"
     "licationRpc\022J\n\003Cmd\022 .ApplicationRpcProto"
     ".CommandArgs\032!.ApplicationRpcProto.Comma"
@@ -186,9 +182,7 @@ PROTOBUF_NDEBUG_INLINE CommandArgs::Impl_::Impl_(
     const ::ApplicationRpcProto::CommandArgs& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        command_(arena, from.command_),
-        clientid_(arena, from.clientid_),
-        seqid_(arena, from.seqid_) {}
+        command_(arena, from.command_) {}
 
 CommandArgs::CommandArgs(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -203,6 +197,13 @@ CommandArgs::CommandArgs(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char *>(&_impl_) +
+               offsetof(Impl_, clientid_),
+           reinterpret_cast<const char *>(&from._impl_) +
+               offsetof(Impl_, clientid_),
+           offsetof(Impl_, seqid_) -
+               offsetof(Impl_, clientid_) +
+               sizeof(Impl_::seqid_));
 
   // @@protoc_insertion_point(copy_constructor:ApplicationRpcProto.CommandArgs)
 }
@@ -210,12 +211,16 @@ PROTOBUF_NDEBUG_INLINE CommandArgs::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        command_(arena),
-        clientid_(arena),
-        seqid_(arena) {}
+        command_(arena) {}
 
 inline void CommandArgs::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char *>(&_impl_) +
+               offsetof(Impl_, clientid_),
+           0,
+           offsetof(Impl_, seqid_) -
+               offsetof(Impl_, clientid_) +
+               sizeof(Impl_::seqid_));
 }
 CommandArgs::~CommandArgs() {
   // @@protoc_insertion_point(destructor:ApplicationRpcProto.CommandArgs)
@@ -226,8 +231,6 @@ inline void CommandArgs::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.command_.Destroy();
-  this_._impl_.clientid_.Destroy();
-  this_._impl_.seqid_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -294,26 +297,26 @@ CommandArgs::_table_ = {
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
     {::_pbi::TcParser::MiniParse, {}},
-    // bytes command = 1;
+    // int64 ClientId = 1;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(CommandArgs, _impl_.clientid_), 1>(),
+     {8, 1, 0, PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.clientid_)}},
+    // int64 SeqId = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(CommandArgs, _impl_.seqid_), 2>(),
+     {16, 2, 0, PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.seqid_)}},
+    // bytes Command = 3;
     {::_pbi::TcParser::FastBS1,
-     {10, 0, 0, PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.command_)}},
-    // bytes ClientId = 2;
-    {::_pbi::TcParser::FastBS1,
-     {18, 1, 0, PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.clientid_)}},
-    // bytes SeqId = 3;
-    {::_pbi::TcParser::FastBS1,
-     {26, 2, 0, PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.seqid_)}},
+     {26, 0, 0, PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.command_)}},
   }}, {{
     65535, 65535
   }}, {{
-    // bytes command = 1;
-    {PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.command_), _Internal::kHasBitsOffset + 0, 0,
-    (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
-    // bytes ClientId = 2;
+    // int64 ClientId = 1;
     {PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.clientid_), _Internal::kHasBitsOffset + 1, 0,
-    (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
-    // bytes SeqId = 3;
+    (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // int64 SeqId = 2;
     {PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.seqid_), _Internal::kHasBitsOffset + 2, 0,
+    (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // bytes Command = 3;
+    {PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.command_), _Internal::kHasBitsOffset + 0, 0,
     (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
   }},
   // no aux_entries
@@ -328,16 +331,13 @@ PROTOBUF_NOINLINE void CommandArgs::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if ((cached_has_bits & 0x00000007u) != 0) {
-    if ((cached_has_bits & 0x00000001u) != 0) {
-      _impl_.command_.ClearNonDefaultToEmpty();
-    }
-    if ((cached_has_bits & 0x00000002u) != 0) {
-      _impl_.clientid_.ClearNonDefaultToEmpty();
-    }
-    if ((cached_has_bits & 0x00000004u) != 0) {
-      _impl_.seqid_.ClearNonDefaultToEmpty();
-    }
+  if ((cached_has_bits & 0x00000001u) != 0) {
+    _impl_.command_.ClearNonDefaultToEmpty();
+  }
+  if ((cached_has_bits & 0x00000006u) != 0) {
+    ::memset(&_impl_.clientid_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.seqid_) -
+        reinterpret_cast<char*>(&_impl_.clientid_)) + sizeof(_impl_.seqid_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -358,26 +358,28 @@ PROTOBUF_NOINLINE void CommandArgs::Clear() {
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
-  // bytes command = 1;
+  // int64 ClientId = 1;
+  if ((this_._impl_._has_bits_[0] & 0x00000002u) != 0) {
+    if (this_._internal_clientid() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<1>(
+              stream, this_._internal_clientid(), target);
+    }
+  }
+
+  // int64 SeqId = 2;
+  if ((this_._impl_._has_bits_[0] & 0x00000004u) != 0) {
+    if (this_._internal_seqid() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
+              stream, this_._internal_seqid(), target);
+    }
+  }
+
+  // bytes Command = 3;
   if ((this_._impl_._has_bits_[0] & 0x00000001u) != 0) {
     if (!this_._internal_command().empty()) {
       const std::string& _s = this_._internal_command();
-      target = stream->WriteBytesMaybeAliased(1, _s, target);
-    }
-  }
-
-  // bytes ClientId = 2;
-  if ((this_._impl_._has_bits_[0] & 0x00000002u) != 0) {
-    if (!this_._internal_clientid().empty()) {
-      const std::string& _s = this_._internal_clientid();
-      target = stream->WriteBytesMaybeAliased(2, _s, target);
-    }
-  }
-
-  // bytes SeqId = 3;
-  if ((this_._impl_._has_bits_[0] & 0x00000004u) != 0) {
-    if (!this_._internal_seqid().empty()) {
-      const std::string& _s = this_._internal_seqid();
       target = stream->WriteBytesMaybeAliased(3, _s, target);
     }
   }
@@ -408,25 +410,25 @@ PROTOBUF_NOINLINE void CommandArgs::Clear() {
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
   if ((cached_has_bits & 0x00000007u) != 0) {
-    // bytes command = 1;
+    // bytes Command = 3;
     if ((cached_has_bits & 0x00000001u) != 0) {
       if (!this_._internal_command().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
                                         this_._internal_command());
       }
     }
-    // bytes ClientId = 2;
+    // int64 ClientId = 1;
     if ((cached_has_bits & 0x00000002u) != 0) {
-      if (!this_._internal_clientid().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
-                                        this_._internal_clientid());
+      if (this_._internal_clientid() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_clientid());
       }
     }
-    // bytes SeqId = 3;
+    // int64 SeqId = 2;
     if ((cached_has_bits & 0x00000004u) != 0) {
-      if (!this_._internal_seqid().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
-                                        this_._internal_seqid());
+      if (this_._internal_seqid() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_seqid());
       }
     }
   }
@@ -454,21 +456,13 @@ void CommandArgs::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::goo
       }
     }
     if ((cached_has_bits & 0x00000002u) != 0) {
-      if (!from._internal_clientid().empty()) {
-        _this->_internal_set_clientid(from._internal_clientid());
-      } else {
-        if (_this->_impl_.clientid_.IsDefault()) {
-          _this->_internal_set_clientid("");
-        }
+      if (from._internal_clientid() != 0) {
+        _this->_impl_.clientid_ = from._impl_.clientid_;
       }
     }
     if ((cached_has_bits & 0x00000004u) != 0) {
-      if (!from._internal_seqid().empty()) {
-        _this->_internal_set_seqid(from._internal_seqid());
-      } else {
-        if (_this->_impl_.seqid_.IsDefault()) {
-          _this->_internal_set_seqid("");
-        }
+      if (from._internal_seqid() != 0) {
+        _this->_impl_.seqid_ = from._impl_.seqid_;
       }
     }
   }
@@ -491,8 +485,12 @@ void CommandArgs::InternalSwap(CommandArgs* PROTOBUF_RESTRICT PROTOBUF_NONNULL o
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.command_, &other->_impl_.command_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.clientid_, &other->_impl_.clientid_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.seqid_, &other->_impl_.seqid_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.seqid_)
+      + sizeof(CommandArgs::_impl_.seqid_)
+      - PROTOBUF_FIELD_OFFSET(CommandArgs, _impl_.clientid_)>(
+          reinterpret_cast<char*>(&_impl_.clientid_),
+          reinterpret_cast<char*>(&other->_impl_.clientid_));
 }
 
 ::google::protobuf::Metadata CommandArgs::GetMetadata() const {

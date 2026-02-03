@@ -2,7 +2,6 @@
 // Created by 19327 on 2026/02/01/星期日.
 //
 #pragma once
-
 #include "string"
 #include "unordered_map"
 
@@ -13,7 +12,18 @@ private:
     void ParseTerm(std::string &term);
 
 public:
+    int getConfigLen(){
+        return config_map.size()/2;
+    }
     void LocalConfigFile(const char *filename);
 
     std::string get(const std::string &key);
+
+    std::string toString(){
+        std::string ret;
+        for (auto &item : config_map) {
+            ret += item.first + "=" + item.second + "\n";
+        }
+        return ret;
+    };
 };

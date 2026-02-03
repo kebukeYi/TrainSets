@@ -1,3 +1,3 @@
 file(GLOB src_list "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 
-set(src_raft_core ${src_list})
+set(src_raft_core ${src_list} CACHE INTERNAL "Description of the variable")

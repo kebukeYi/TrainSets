@@ -430,11 +430,11 @@ class CommandArgs final : public ::google::protobuf::Message
 
   // accessors -------------------------------------------------------
   enum : int {
-    kCommandFieldNumber = 1,
-    kClientIdFieldNumber = 2,
-    kSeqIdFieldNumber = 3,
+    kCommandFieldNumber = 3,
+    kClientIdFieldNumber = 1,
+    kSeqIdFieldNumber = 2,
   };
-  // bytes command = 1;
+  // bytes Command = 3;
   void clear_command() ;
   const std::string& command() const;
   template <typename Arg_ = const std::string&, typename... Args_>
@@ -449,34 +449,24 @@ class CommandArgs final : public ::google::protobuf::Message
   std::string* PROTOBUF_NONNULL _internal_mutable_command();
 
   public:
-  // bytes ClientId = 2;
+  // int64 ClientId = 1;
   void clear_clientid() ;
-  const std::string& clientid() const;
-  template <typename Arg_ = const std::string&, typename... Args_>
-  void set_clientid(Arg_&& arg, Args_... args);
-  std::string* PROTOBUF_NONNULL mutable_clientid();
-  [[nodiscard]] std::string* PROTOBUF_NULLABLE release_clientid();
-  void set_allocated_clientid(std::string* PROTOBUF_NULLABLE value);
+  ::int64_t clientid() const;
+  void set_clientid(::int64_t value);
 
   private:
-  const std::string& _internal_clientid() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_clientid(const std::string& value);
-  std::string* PROTOBUF_NONNULL _internal_mutable_clientid();
+  ::int64_t _internal_clientid() const;
+  void _internal_set_clientid(::int64_t value);
 
   public:
-  // bytes SeqId = 3;
+  // int64 SeqId = 2;
   void clear_seqid() ;
-  const std::string& seqid() const;
-  template <typename Arg_ = const std::string&, typename... Args_>
-  void set_seqid(Arg_&& arg, Args_... args);
-  std::string* PROTOBUF_NONNULL mutable_seqid();
-  [[nodiscard]] std::string* PROTOBUF_NULLABLE release_seqid();
-  void set_allocated_seqid(std::string* PROTOBUF_NULLABLE value);
+  ::int64_t seqid() const;
+  void set_seqid(::int64_t value);
 
   private:
-  const std::string& _internal_seqid() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_seqid(const std::string& value);
-  std::string* PROTOBUF_NONNULL _internal_mutable_seqid();
+  ::int64_t _internal_seqid() const;
+  void _internal_set_seqid(::int64_t value);
 
   public:
   // @@protoc_insertion_point(class_scope:ApplicationRpcProto.CommandArgs)
@@ -506,8 +496,8 @@ class CommandArgs final : public ::google::protobuf::Message
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr command_;
-    ::google::protobuf::internal::ArenaStringPtr clientid_;
-    ::google::protobuf::internal::ArenaStringPtr seqid_;
+    ::int64_t clientid_;
+    ::int64_t seqid_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -532,7 +522,55 @@ extern const ::google::protobuf::internal::ClassDataFull CommandArgs_class_data_
 
 // CommandArgs
 
-// bytes command = 1;
+// int64 ClientId = 1;
+inline void CommandArgs::clear_clientid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.clientid_ = ::int64_t{0};
+  _impl_._has_bits_[0] &= ~0x00000002u;
+}
+inline ::int64_t CommandArgs::clientid() const {
+  // @@protoc_insertion_point(field_get:ApplicationRpcProto.CommandArgs.ClientId)
+  return _internal_clientid();
+}
+inline void CommandArgs::set_clientid(::int64_t value) {
+  _internal_set_clientid(value);
+  _impl_._has_bits_[0] |= 0x00000002u;
+  // @@protoc_insertion_point(field_set:ApplicationRpcProto.CommandArgs.ClientId)
+}
+inline ::int64_t CommandArgs::_internal_clientid() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.clientid_;
+}
+inline void CommandArgs::_internal_set_clientid(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.clientid_ = value;
+}
+
+// int64 SeqId = 2;
+inline void CommandArgs::clear_seqid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.seqid_ = ::int64_t{0};
+  _impl_._has_bits_[0] &= ~0x00000004u;
+}
+inline ::int64_t CommandArgs::seqid() const {
+  // @@protoc_insertion_point(field_get:ApplicationRpcProto.CommandArgs.SeqId)
+  return _internal_seqid();
+}
+inline void CommandArgs::set_seqid(::int64_t value) {
+  _internal_set_seqid(value);
+  _impl_._has_bits_[0] |= 0x00000004u;
+  // @@protoc_insertion_point(field_set:ApplicationRpcProto.CommandArgs.SeqId)
+}
+inline ::int64_t CommandArgs::_internal_seqid() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.seqid_;
+}
+inline void CommandArgs::_internal_set_seqid(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.seqid_ = value;
+}
+
+// bytes Command = 3;
 inline void CommandArgs::clear_command() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.command_.ClearToEmpty();
@@ -540,7 +578,7 @@ inline void CommandArgs::clear_command() {
 }
 inline const std::string& CommandArgs::command() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:ApplicationRpcProto.CommandArgs.command)
+  // @@protoc_insertion_point(field_get:ApplicationRpcProto.CommandArgs.Command)
   return _internal_command();
 }
 template <typename Arg_, typename... Args_>
@@ -548,12 +586,12 @@ PROTOBUF_ALWAYS_INLINE void CommandArgs::set_command(Arg_&& arg, Args_... args) 
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_._has_bits_[0] |= 0x00000001u;
   _impl_.command_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:ApplicationRpcProto.CommandArgs.command)
+  // @@protoc_insertion_point(field_set:ApplicationRpcProto.CommandArgs.Command)
 }
 inline std::string* PROTOBUF_NONNULL CommandArgs::mutable_command()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   std::string* _s = _internal_mutable_command();
-  // @@protoc_insertion_point(field_mutable:ApplicationRpcProto.CommandArgs.command)
+  // @@protoc_insertion_point(field_mutable:ApplicationRpcProto.CommandArgs.Command)
   return _s;
 }
 inline const std::string& CommandArgs::_internal_command() const {
@@ -572,7 +610,7 @@ inline std::string* PROTOBUF_NONNULL CommandArgs::_internal_mutable_command() {
 }
 inline std::string* PROTOBUF_NULLABLE CommandArgs::release_command() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:ApplicationRpcProto.CommandArgs.command)
+  // @@protoc_insertion_point(field_release:ApplicationRpcProto.CommandArgs.Command)
   if ((_impl_._has_bits_[0] & 0x00000001u) == 0) {
     return nullptr;
   }
@@ -594,137 +632,7 @@ inline void CommandArgs::set_allocated_command(std::string* PROTOBUF_NULLABLE va
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.command_.IsDefault()) {
     _impl_.command_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:ApplicationRpcProto.CommandArgs.command)
-}
-
-// bytes ClientId = 2;
-inline void CommandArgs::clear_clientid() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.clientid_.ClearToEmpty();
-  _impl_._has_bits_[0] &= ~0x00000002u;
-}
-inline const std::string& CommandArgs::clientid() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:ApplicationRpcProto.CommandArgs.ClientId)
-  return _internal_clientid();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void CommandArgs::set_clientid(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_._has_bits_[0] |= 0x00000002u;
-  _impl_.clientid_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:ApplicationRpcProto.CommandArgs.ClientId)
-}
-inline std::string* PROTOBUF_NONNULL CommandArgs::mutable_clientid()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  std::string* _s = _internal_mutable_clientid();
-  // @@protoc_insertion_point(field_mutable:ApplicationRpcProto.CommandArgs.ClientId)
-  return _s;
-}
-inline const std::string& CommandArgs::_internal_clientid() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.clientid_.Get();
-}
-inline void CommandArgs::_internal_set_clientid(const std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_._has_bits_[0] |= 0x00000002u;
-  _impl_.clientid_.Set(value, GetArena());
-}
-inline std::string* PROTOBUF_NONNULL CommandArgs::_internal_mutable_clientid() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_._has_bits_[0] |= 0x00000002u;
-  return _impl_.clientid_.Mutable( GetArena());
-}
-inline std::string* PROTOBUF_NULLABLE CommandArgs::release_clientid() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:ApplicationRpcProto.CommandArgs.ClientId)
-  if ((_impl_._has_bits_[0] & 0x00000002u) == 0) {
-    return nullptr;
-  }
-  _impl_._has_bits_[0] &= ~0x00000002u;
-  auto* released = _impl_.clientid_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.clientid_.Set("", GetArena());
-  }
-  return released;
-}
-inline void CommandArgs::set_allocated_clientid(std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    _impl_._has_bits_[0] |= 0x00000002u;
-  } else {
-    _impl_._has_bits_[0] &= ~0x00000002u;
-  }
-  _impl_.clientid_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.clientid_.IsDefault()) {
-    _impl_.clientid_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:ApplicationRpcProto.CommandArgs.ClientId)
-}
-
-// bytes SeqId = 3;
-inline void CommandArgs::clear_seqid() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.seqid_.ClearToEmpty();
-  _impl_._has_bits_[0] &= ~0x00000004u;
-}
-inline const std::string& CommandArgs::seqid() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:ApplicationRpcProto.CommandArgs.SeqId)
-  return _internal_seqid();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void CommandArgs::set_seqid(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_._has_bits_[0] |= 0x00000004u;
-  _impl_.seqid_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:ApplicationRpcProto.CommandArgs.SeqId)
-}
-inline std::string* PROTOBUF_NONNULL CommandArgs::mutable_seqid()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  std::string* _s = _internal_mutable_seqid();
-  // @@protoc_insertion_point(field_mutable:ApplicationRpcProto.CommandArgs.SeqId)
-  return _s;
-}
-inline const std::string& CommandArgs::_internal_seqid() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.seqid_.Get();
-}
-inline void CommandArgs::_internal_set_seqid(const std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_._has_bits_[0] |= 0x00000004u;
-  _impl_.seqid_.Set(value, GetArena());
-}
-inline std::string* PROTOBUF_NONNULL CommandArgs::_internal_mutable_seqid() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_._has_bits_[0] |= 0x00000004u;
-  return _impl_.seqid_.Mutable( GetArena());
-}
-inline std::string* PROTOBUF_NULLABLE CommandArgs::release_seqid() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:ApplicationRpcProto.CommandArgs.SeqId)
-  if ((_impl_._has_bits_[0] & 0x00000004u) == 0) {
-    return nullptr;
-  }
-  _impl_._has_bits_[0] &= ~0x00000004u;
-  auto* released = _impl_.seqid_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.seqid_.Set("", GetArena());
-  }
-  return released;
-}
-inline void CommandArgs::set_allocated_seqid(std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    _impl_._has_bits_[0] |= 0x00000004u;
-  } else {
-    _impl_._has_bits_[0] &= ~0x00000004u;
-  }
-  _impl_.seqid_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.seqid_.IsDefault()) {
-    _impl_.seqid_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:ApplicationRpcProto.CommandArgs.SeqId)
+  // @@protoc_insertion_point(field_set_allocated:ApplicationRpcProto.CommandArgs.Command)
 }
 
 // -------------------------------------------------------------------

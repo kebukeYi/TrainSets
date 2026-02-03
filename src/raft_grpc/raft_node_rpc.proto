@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package RaftNodeRpcProtoc;
 
+// protoc --cpp_out=. --grpc_out=. --plugin=protoc-gen-grpc=`which grpc_cpp_plugin` raft_node_rpc.proto
 // Leader 下发 日志条目有关;
 message LogEntry{
   // 指令: set key val; get val;
