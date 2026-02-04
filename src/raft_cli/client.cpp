@@ -10,7 +10,7 @@ Client::Client() : clientId(GenClientId()), seqId(0), leaderId(0) {}
 void Client::init(std::string &configFileName) {
     Config config;
     config.LocalConfigFile(configFileName.c_str());
-    printf("config_map:%s\n", config.toString().c_str());
+//    printf("config_map:%s\n", config.encodeToString().c_str());
 
     std::vector<std::pair<std::string, short>> ipAndPort;
     for (int i = 0; i < config.getConfigLen(); i++) {
@@ -20,7 +20,7 @@ void Client::init(std::string &configFileName) {
         if (ip.empty()) {
             DPrintf("【Client::init】%s", "ip为空");
         }
-        DPrintf("【Client::init】ip：%s", ip.c_str());
+//        DPrintf("【Client::init】ip：%s", ip.c_str());
 
         // node0port=27899
         std::string portStr = config.get(node + "port");
@@ -30,11 +30,11 @@ void Client::init(std::string &configFileName) {
         int port = 0;
         try {
             port = std::stoi(portStr);
-        } catch (std::invalid_argument) {
+        } catch (...) {
             DPrintf("【Client::init】%s", "port转换失败");
             return;
         }
-        ipAndPort.push_back(std::make_pair(ip, port));
+        ipAndPort.emplace_back(ip, port);
     }
 
     // 进行连接
@@ -46,7 +46,19 @@ void Client::init(std::string &configFileName) {
     }
 }
 
-std::string Client::Cmd(std::string &command) {
+std::string Client::parseResp(std::string &resp) {
+    respParser.append(resp);
+    auto respValue = respParser.tryParseOne();
+    if (respValue.has_value()) {
+        auto value = respValue.value();
+        std::string bulk;
+        auto res = RespValueToString(value, bulk);
+        return res;
+    }
+    return "";
+}
+
+std::string Client::Cmd(std::string &raw, std::string &command) {
     seqId++;
     ApplicationRpcProto::CommandArgs request;
     ApplicationRpcProto::CommandReply response;
@@ -55,29 +67,46 @@ std::string Client::Cmd(std::string &command) {
     request.set_seqid(seqId);
     auto server = leaderId;
     while (true) {
+        auto peer = servers[server];
+        if (peer == nullptr) {
+            DPrintf("【Client::Cmd】peer为空");
+            server++;
+            server = static_cast<int64_t >(server % static_cast<int64_t >(servers.size()));
+            sleep(3);
+            continue;
+        }
 
-        grpc::Status status = servers[server]->CallCmd(request, response);
+        grpc::Status status = peer->CallCmd(request, response);
 
         if (!status.ok()) {
-            printf("【Client::Cmd】CallCmd {%ld}请求失败, 错误原因:{%s}\n",
-                   server,status.error_message().c_str());
+            printf("【Client::Cmd】CallCmd {%ld}请求失败, 4秒后重试; 错误原因:{%s}\n", server,
+                   status.error_message().c_str());
             sleep(4);
             continue;
         }
 
         if (response.err() == ErrWrongLeader) {
-            DPrintf("【Client::Cmd】原以为的leader：{%d}请求失败,3秒后向新leader{%d}重试;", server, server + 1);
+            DPrintf("【Client::Cmd】原以为的leader:{%d}请求失败, 3秒后向新node{%d}重试;", server, server + 1);
             server++;
             server = static_cast<int64_t >(server % static_cast<int64_t >(servers.size()));
+            sleep(3);
+            continue;
+        }
 
+        if (response.err() == ErrTimeout) {
+            DPrintf("【Client::Cmd】请求leader{%d}超时, 3秒后重试, command:%s ", server, raw.c_str());
             sleep(3);
             continue;
         }
 
         if (response.err() == OK) {
             leaderId = server;
-            DPrintf("【Client::Cmd】请求成功，返回值：{%s}", response.value().c_str());
-            return response.value();
+            auto res = parseResp(const_cast<std::string &>(response.value()));
+            DPrintf("【Client::Cmd】请求成功, 返回值：{%s}", res.c_str());
+            return res;
+        } else {
+            DPrintf("【Client::Cmd】请求leader{%d}失败, 错误原因：{%s}", server, response.err().c_str());
+            return "";
         }
     }
 }
@@ -92,7 +121,8 @@ std::string Client::set(const std::string &key, const std::string &value, std::o
         parts.push_back(std::to_string(ttl_ms.value()));
     }
     auto command = toRespArray(parts);
-    return Cmd(command);
+    auto raw = "set " + key + " " + value;
+    return Cmd(raw, command);
 }
 
 // string : Client::set mm kk 123456789
@@ -103,10 +133,12 @@ std::string Client::setWithExpireAtMs(const std::string &key, const std::string 
 // string : Client::get mm
 std::string Client::get(const std::string &key) {
     std::vector<std::string> parts;
-    parts.push_back("get");
-    parts.push_back(key);
+    parts.emplace_back("get");
+    parts.emplace_back(key);
     auto command = toRespArray(parts);
-    return Cmd(command);
+    auto raw = "get " + key;
+    auto result = Cmd(raw, command);
+    return result;
 }
 
 //  string :Client:: del mm
@@ -117,7 +149,11 @@ std::string Client::del(const std::vector<std::string> &keys) {
         parts.push_back(key);
     }
     auto command = toRespArray(parts);
-    return Cmd(command);
+    std::string raw = "del ";
+    for (const auto &key: keys) {
+        raw += key + " ";
+    }
+    return Cmd(raw, command);
 }
 
 //  string :Client:: exists mm

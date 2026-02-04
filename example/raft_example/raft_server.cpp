@@ -1,56 +1,60 @@
 //
 // Created by 19327 on 2026/02/02/星期一.
 //
+#include <csignal>
 #include "raft.h"
 #include "application_server.h"
 
 void ShowArgsHelp();
 
 int main(int argc, char **argv) {
-    // -i 1 -n 3 -f raft_node.conf
+    // ./example_raft_server -i 0 -n 3 -f ../conf/raft_node.conf -m ../conf/everysec.conf
+    // ./example_raft_server -i 1 -n 3 -f ../conf/raft_node.conf -m ../conf/everysec.conf
+    // ./example_raft_server -i 2 -n 3 -f ../conf/raft_node.conf -m ../conf/everysec.conf
     if (argc < 2) {
         ShowArgsHelp();
         exit(EXIT_FAILURE);
     }
-    int nodeNum = 0;
-    int me =-1;
-    std::string configFileName;
-    char c;
-    while ((c = getopt(argc, argv, "i:n:f:")) != -1) {
-        switch (c) {
-            case 'i':
-                me = atoi(optarg);
-                break;
-            case 'n':
-                nodeNum = atoi(optarg);
-                break;
-            case 'f':
-                configFileName = optarg;
-                break;
-            default:
-                ShowArgsHelp();
-                exit(EXIT_FAILURE);
-        }
-    }
+    int nodeId = 0;
+    int nodeSum = 0;
+    std::string raftNodeConfigFilePath;
+    std::string machineConfigFilePath;
 
-//    std::string machineFilePath = "machine_" + std::to_string(me) + ".txt";
-//    ApplicationServer server(me, 600, configFileName, machineFilePath);
-
-    for (int i = 0; i < nodeNum; i++) {
-        std::string machineFilePath = "machine_" + std::to_string(i) + ".txt";
-        pid_t pid = fork();
-        if (pid == 0) {
-            ApplicationServer server(i, 600, configFileName, machineFilePath);
-            pause();
-        } else if (pid > 0) {
-            sleep(1);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-i") {
+            nodeId = std::stoi(argv[++i]);
+        } else if (arg == "-n") {
+            nodeSum = std::stoi(argv[++i]);
+        } else if (arg == "-f") {
+            raftNodeConfigFilePath = argv[++i];
+        } else if (arg == "-m") {
+            machineConfigFilePath = argv[++i];
         } else {
-            // 如果创建进程失败
-            std::cerr << "Failed to create child process." << std::endl;
+            std::cerr << "Invalid argument: " << arg << std::endl;
+            ShowArgsHelp();
             exit(EXIT_FAILURE);
         }
     }
-    pause();
+
+    ApplicationServer server(nodeId, 600, raftNodeConfigFilePath, machineConfigFilePath);
+
+
+    // 控制起几个 raftNode;
+//    for (int i = 0; i < nodeNum; i++) {
+//        pid_t pid = fork();
+//        if (pid == 0) {
+//            ApplicationServer server(i, 600, raftNodeConfigFilePath, machineConfigFilePath);
+//            pause();
+//        } else if (pid > 0) {
+//            sleep(1);
+//        } else {
+//            // 如果创建进程失败
+//            std::cerr << "Failed to create child process." << std::endl;
+//            exit(EXIT_FAILURE);
+//        }
+//    }
+//    pause();
     return 0;
 }
 

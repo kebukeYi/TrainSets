@@ -69,7 +69,7 @@ grpc::Status Raft::InstallSnapshot(grpc::ServerContext *context, const RaftNodeR
     // 但是由于现在getSlicesIndexFromLogIndex的实现，不能传入不存在logIndex，否则会panic
     auto lastLogIndex = getLastLogIndex();
     if (lastLogIndex > request->lastincludedindex()) {
-        logs.erase(logs.begin(), logs.begin() + getLogicLogIndex(request->lastincludedindex()) + 1);
+        logs.erase(logs.begin(), logs.begin() + getRealLogIndex(request->lastincludedindex()) + 1);
     } else {
         // 日志短了，全部清空;
         logs.clear();
@@ -106,7 +106,7 @@ void Raft::Snapshot(int64_t logIndex, std::string &snapshot) {
     int64_t newSnapshotTerm = getLogTermFromIndex(newSnapshotIndex);
     std::vector<RaftNodeRpcProtoc::LogEntry> newLogs;
     for (int i = logIndex + 1; i <= lastLogIndex; ++i) {
-        auto idx = getLogicLogIndex(i);
+        auto idx = getRealLogIndex(i);
         newLogs.emplace_back(logs[idx]);
     }
     snapshotIndex = newSnapshotIndex;

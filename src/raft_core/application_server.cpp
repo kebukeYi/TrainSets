@@ -6,21 +6,55 @@
 
 grpc::Status ApplicationServer::Cmd(::grpc::ServerContext *context, const ::ApplicationRpcProto::CommandArgs *request,
                                     ::ApplicationRpcProto::CommandReply *response) {
-    auto result = state_machine->Cmd(request->command());
-    if (!result.Error.empty()) {
-        response->set_err(result.Error);
+    Op op;
+    op.seqId = request->seqid();
+    op.clientId = request->clientid();
+    op.command = request->command();
+    int64_t raftIndex = -1;
+    int64_t _ = -1;
+    bool isLeader = false;
+    // 等待 raft commit 当前指令;
+    raft->Start(op, &raftIndex, &_, &isLeader);
+    if (!isLeader) {
+        response->set_err(ErrWrongLeader);
         return grpc::Status::OK;
     }
-    response->set_value(result.Value);
-    response->set_err(OK);
+
+    mtx.lock();
+    if (waitApplyCh.find(raftIndex) == waitApplyCh.end()) {
+        waitApplyCh.insert(std::make_pair(raftIndex, new LockQueue<Op>()));
+    }
+
+    auto chan = waitApplyCh[raftIndex];
+    mtx.unlock();
+
+    Op opReply;
+    if (!chan->timeOutPop(consensusTimeOut, &opReply)) {
+        printf("raftServer node:%d, raftIndex:%ld, seqId:%ld, clientId:%ld\n",
+               me, raftIndex, opReply.seqId, opReply.clientId);
+        response->set_err(ErrTimeout);
+    } else {
+        if (!opReply.err.empty()) {
+            response->set_value(opReply.value);
+            response->set_err(OK);
+        } else {
+            response->set_err(opReply.err);
+        }
+    }
+
+    mtx.lock();
+    auto tmp = waitApplyCh[raftIndex];
+    waitApplyCh.erase(raftIndex);
+    delete tmp;
+    mtx.unlock();
     return grpc::Status::OK;
 }
 
 
-ApplicationServer::ApplicationServer(int me, int64_t maxRaftState, std::string nodeConfFilePath,
+ApplicationServer::ApplicationServer(int me, int64_t maxRaftState_, std::string nodeConfFilePath,
                                      std::string &stateMachineConfPath) {
     std::shared_ptr<Persisted> persisted = std::make_shared<Persisted>(me);
-    maxRaftState = maxRaftState;
+    maxRaftState = maxRaftState_;
     isShutdown.store(false);
     applyChan = std::make_shared<LockQueue<ApplyMsg>>();
     raft = std::make_shared<Raft>();
@@ -28,35 +62,38 @@ ApplicationServer::ApplicationServer(int me, int64_t maxRaftState, std::string n
     Config config;
     config.LocalConfigFile(nodeConfFilePath.c_str());
     std::vector<std::pair<std::string, short>> ipAndPort;
-    // ipAndPort.resize(config.getConfigLen());
     for (int i = 0; i < config.getConfigLen(); i++) {
         // node0ip=127.0.1.1
         std::string node = "node" + std::to_string(i);
         std::string ip = config.get(node + "ip");
+        std::string port = config.get(node + "port");
         // node0port=27899
-        ipAndPort.emplace_back(ip, std::stoi(config.get(node + "port")));
+        ipAndPort.emplace_back(ip, std::stoi(port));
     }
+
     // 获得本地 ip 和端口;
     auto localIp = ipAndPort[me];
-    auto address = localIp.first + ":" + std::to_string(localIp.second);
+    std::string address = "127.0.0.1:" + std::to_string(localIp.second);
 
     // 使用 shared_ptr 确保服务器对象的生命周期
     std::shared_ptr<grpc::Server> server;
     std::thread t([this, me, localIp, address, &server]() -> void {
         grpc::ServerBuilder builder;
         builder.RegisterService(this);
-        builder.RegisterService(raft.get());
+        if (raft) {
+            builder.RegisterService(raft.get());
+        }
         builder.AddListeningPort(address, grpc::InsecureServerCredentials());
         server = builder.BuildAndStart();
         // 增加错误检查：如果 BuildAndStart 失败，打印日志
         if (!server) {
-            printf("local-raft-node:%d, address:%s start FAILED!\n", me, address.c_str());
+            printf("local-raft-node:%d, address:%s start FAILED! \n", me, address.c_str());
             return;
         }
         // 保存服务器引用以便后续可以关闭
         this->grpc_server = server;
-        printf("local-raft-node:%d, ip:%s, port:%d address:%s starting...\n", me, localIp.first.c_str(), localIp.second,
-               address.c_str());
+        printf("local-raft-node:%d, ip:%s, port:%d address:%s starting...\n",
+               me, localIp.first.c_str(), localIp.second, address.c_str());
         // 节点启动
         server->Wait();
     });
@@ -73,19 +110,21 @@ ApplicationServer::ApplicationServer(int me, int64_t maxRaftState, std::string n
             peers.push_back(nullptr);
             continue;
         }
-        peers.push_back(std::make_shared<RaftNodeRpcUtil>(ipAndPort[i].first, ipAndPort[i].second));
+        RaftNodeRpcUtil raftNodeRpcUtil(ipAndPort[i].first, ipAndPort[i].second);
+        peers.push_back(std::make_shared<RaftNodeRpcUtil>(raftNodeRpcUtil));
     }
 
     sleep(ipAndPort.size() - me + 1);  // 等待所有节点相互连接成功, 再启动raft;
 
     printf("raftServer node:%d, start to init raft\n", me);
+
     raft->init(me, peers, persisted, applyChan);
 
     state_machine = std::make_unique<StateMachine>(stateMachineConfPath);
     if (!state_machine->init()) {
         std::cout << "state_machine init failed" << std::endl;
         return;
-    };
+    }
 
     auto snapshot = persisted->LoadSnapshot(); // 固定路径的快照文件;
     if (!snapshot.empty()) {
@@ -111,7 +150,7 @@ void ApplicationServer::ReadRaftCommandTicker() {
 
 void ApplicationServer::handleRaftCommand(ApplyMsg msg) {
     Op op;
-    op.parseFromString(msg.Command);
+    op.decodeFromString(msg.Command);
     if (msg.CommandIndex <= lastAppliedIndex) {
         return;
     }
@@ -132,14 +171,17 @@ void ApplicationServer::executeCommand(Op &op, Op *opReply) {
     std::lock_guard<std::mutex> lock(mtx);
     opReply->clientId = op.clientId;
     opReply->seqId = op.seqId;
+    // 状态机执行;
     auto result = state_machine->Cmd(op.command);
     if (!result.Error.empty()) {
         DPrintf("[func-application_server::executeCommand()-kvserver{%d}] 执行 raft 命令出错, 错误信息: %s", me,
                 result.Error.c_str());
         opReply->err = result.Error;
+        opReply->value = "";
         return;
     } else {
         opReply->value = result.Value;
+        opReply->err = "";
     }
     lastRequestId[op.clientId] = op.seqId; // 更新最后一个请求的 clientId 和 seqId
 }

@@ -11,6 +11,7 @@
 class Client {
 public:
     std::vector<std::shared_ptr<ToServerRpcUtil>> servers;
+    RespParser respParser;
     int64_t clientId;
     int64_t seqId;
     int64_t leaderId;
@@ -25,7 +26,9 @@ public:
         return rand();
     }
 
-    std::string Cmd(std::string &command);
+    std::string Cmd(std::string &raw,std::string &command);
+
+    std::string parseResp(std::string &resp);
 
 // string : set mm kk
     std::string set(const std::string &key, const std::string &value, std::optional<int64_t> ttl_ms = std::nullopt);

@@ -19,6 +19,7 @@
 #include "raft_node_rpc.grpc.pb.h"
 
 class Raft : public RaftNodeRpcProtoc::RaftNodeRpc::Service {
+
 private:
     std::atomic<bool> isStop;
     std::mutex mtx;
@@ -34,7 +35,7 @@ private:
 
     int64_t commitIndex;
     int64_t lastAppliedIndex;
-    std::vector<int64_t> nextIndex;
+    std::vector<int64_t> nextIndex; // 逻辑序列号
     std::vector<int64_t> matchIndex;
     enum Role {
         Leader, Follower, Candidate
@@ -91,7 +92,7 @@ public:
                          std::shared_ptr<RaftNodeRpcProtoc::RequestVoteReply> reply, std::shared_ptr<int> votedNum);
 
     grpc::Status RequestVote(grpc::ServerContext *context, const RaftNodeRpcProtoc::RequestVoteArgs *request,
-                             RaftNodeRpcProtoc::RequestVoteReply *response);
+                             RaftNodeRpcProtoc::RequestVoteReply *response) override;
 
     void replicationTicker();
 
@@ -101,12 +102,12 @@ public:
                            std::shared_ptr<RaftNodeRpcProtoc::AppendEntriesReply> reply, std::shared_ptr<int> nodeNums);
 
     grpc::Status AppendEntries(grpc::ServerContext *context, const RaftNodeRpcProtoc::AppendEntriesArgs *request,
-                               RaftNodeRpcProtoc::AppendEntriesReply *response);
+                               RaftNodeRpcProtoc::AppendEntriesReply *response) override;
 
     bool sendSnapshot(int server);
 
     grpc::Status InstallSnapshot(grpc::ServerContext *context, const RaftNodeRpcProtoc::InstallSnapshotArgs *request,
-                                 RaftNodeRpcProtoc::InstallSnapshotReply *response);
+                                 RaftNodeRpcProtoc::InstallSnapshotReply *response) override;
 
     void applyTicker();
 
@@ -137,7 +138,9 @@ public:
 
     int64_t getFirstLogIndex(int64_t term);
 
-    int64_t getLogicLogIndex(int64_t logIndex);
+    int64_t getRealLogIndex(int64_t logIndex);
+
+    int64_t  getTailLogIndex(int64_t logIndex);
 
     int64_t getMajorityIndexLocked();
 

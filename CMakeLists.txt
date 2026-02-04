@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 set(Target TrainSets)
-
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
 project(${Target})
 
 set(CMAKE_CXX_STANDARD 17)

@@ -21,6 +21,7 @@ std::string trim(const std::string &str) {
 bool load_config(const std::string &file_path, ServerConfig &config, std::string &err) {
     std::ifstream in(file_path);
     if (!in.good()) {
+        printf("open config failed: %s\n", file_path.c_str());
         err = "open config failed: " + file_path;
         return false;
     }

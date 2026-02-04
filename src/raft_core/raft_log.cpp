@@ -24,13 +24,18 @@ void Raft::getPrevLogInfo(int server, int64_t *prevLogIndex, int64_t *prevLogTer
         *prevLogTerm = snapshotTerm;
         return;
     }
-    *prevLogIndex = nextIndex[server] - 1;
-    *prevLogTerm = logs[static_cast<int>(getLogicLogIndex(*prevLogIndex))].logterm();
+    // nextIndex[server] == StartIndex, 表示没有日志下发过;
+    if (nextIndex[server] == StartIndex) {
+        *prevLogIndex = StartIndex;
+        *prevLogTerm = StartTerm;
+    } else {
+        *prevLogIndex = nextIndex[server] - 1;
+        *prevLogTerm = logs[static_cast<int>(getRealLogIndex(*prevLogIndex))].logterm();
+    }
 }
 
-
 void Raft::getLastLogIndexAndTerm(int64_t *lastLogIndex, int64_t *lastLogTerm) {
-    if (logs.empty()) {
+    if (logs.size() == 1) {
         *lastLogIndex = snapshotIndex;
         *lastLogTerm = snapshotTerm;
         return;
@@ -64,6 +69,9 @@ int64_t Raft::getLastLogTerm() {
 }
 
 int64_t Raft::getLogTermFromIndex(int64_t logIndex) {
+    if (logIndex == StartIndex) {
+        return StartTerm;
+    }
     //  snapshotIndex <= logIndex <= lastLogIndex
     if (logIndex < snapshotIndex || logIndex > getLastLogIndex()) {
         return -1;
@@ -73,24 +81,39 @@ int64_t Raft::getLogTermFromIndex(int64_t logIndex) {
         return snapshotTerm;
     }
     // 2. logIndex 在 日志中;
-    auto index = getLogicLogIndex(logIndex);
+    auto index = getRealLogIndex(logIndex);
     return logs[index].logterm();
 }
 
 bool Raft::isMatchLog(int64_t prevLogIndex, int64_t prevLogTerm) {
-    if (prevLogIndex < snapshotIndex || prevLogIndex > getLastLogIndex()) {
-        return false;
-    }
+    // 0. prevLogIndex 在 日志没有下发过时, 都是零 0 0;
     // 1. prevLogIndex 在 快照临界点;
     // 2. prevLogIndex 在 日志中;
     auto term = getLogTermFromIndex(prevLogIndex);
     return term == prevLogTerm;
 }
 
-int64_t Raft::getLogicLogIndex(int64_t logIndex) {
+int64_t Raft::getTailLogIndex(int64_t logIndex) {
+    if (logIndex >= getLastLogIndex()) {
+        return getLastLogIndex();
+    }
+    return getRealLogIndex(logIndex);
+}
+
+int64_t Raft::getRealLogIndex(int64_t logIndex) {
     // 找到index对应的真实下标位置;
-    if (logIndex < snapshotIndex || logIndex > getLastLogIndex()) {
+    if (logIndex < snapshotIndex) {
+        DPrintf("getRealLogIndex: logIndex %ld out of range [%ld, %ld];log.size: %ld exit;",
+                logIndex, snapshotIndex, getLastLogIndex(), logs.size());
+        exit(-1);
+    }
+    // 如果参数中逻辑下标 大于 日志所存 的 最大逻辑下标, 则返回-1, 表示不存在;
+    if (logIndex > getLastLogIndex()) {
         return -1;
     }
+    // 120 - 100 = 20;
+    // 第 20 个元素;
+    // 0-19
+    // 1-20
     return logIndex - snapshotIndex;
 }

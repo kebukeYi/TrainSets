@@ -6,21 +6,29 @@
 RaftNodeRpcUtil::RaftNodeRpcUtil(std::string ip, short port) {
     std::string server_address{ip + ":" + std::to_string(port)};
     auto channel = grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials());
-    printf("RaftNodeRpcUtil.NewStub: %s\n", server_address.c_str());
-    stub = std::move(RaftNodeRpcProtoc::RaftNodeRpc::NewStub(channel,grpc::StubOptions()));
+    auto stub_ = RaftNodeRpcProtoc::RaftNodeRpc::NewStub(channel, grpc::StubOptions());
+    if (stub_ == nullptr) {
+        printf("RaftNodeRpcUtil.NewStub (%s): failed \n", server_address.c_str());
+        return;
+    }
+    printf("RaftNodeRpcUtil.NewStub (%s): success \n", server_address.c_str());
+    stub = std::move(stub_);
 }
+
 grpc::Status RaftNodeRpcUtil::CallRequestVote(RaftNodeRpcProtoc::RequestVoteArgs *args,
-                                      RaftNodeRpcProtoc::RequestVoteReply *reply) {
+                                              RaftNodeRpcProtoc::RequestVoteReply *reply) {
     grpc::ClientContext context;
     return stub->RequestVote(&context, *args, reply);
 }
+
 grpc::Status RaftNodeRpcUtil::CallAppendEntries(RaftNodeRpcProtoc::AppendEntriesArgs *args,
-                                        RaftNodeRpcProtoc::AppendEntriesReply *reply) {
+                                                RaftNodeRpcProtoc::AppendEntriesReply *reply) {
     grpc::ClientContext context;
     return stub->AppendEntries(&context, *args, reply);
 }
+
 grpc::Status RaftNodeRpcUtil::CallInstallSnapshot(RaftNodeRpcProtoc::InstallSnapshotArgs *args,
-                                          RaftNodeRpcProtoc::InstallSnapshotReply *reply) {
+                                                  RaftNodeRpcProtoc::InstallSnapshotReply *reply) {
     grpc::ClientContext context;
     return stub->InstallSnapshot(&context, *args, reply);
 }

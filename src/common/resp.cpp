@@ -7,6 +7,7 @@
 #include "resp.h"
 
 void RespParser::append(std::string_view data) {
+    clear();
     m_buffer.append(data.data(), data.size());
 }
 

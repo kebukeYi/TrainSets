@@ -18,11 +18,16 @@ void Raft::init(int me, std::vector<std::shared_ptr<RaftNodeRpcUtil>> peers,
     persist_ = std::move(persist);
     applyChan = std::move(applyCh);
 
-    currentTerm = 1;
+    currentTerm = StartTerm;
     votedFor = -1; // -1 means vote for none;
     logs.clear();
-    snapshotIndex = 0;
-    snapshotTerm = 0;
+    RaftNodeRpcProtoc::LogEntry logEntry;
+    logEntry.set_logterm(StartTerm);
+    logEntry.set_logindex(StartIndex);
+    logs.emplace_back(logEntry);
+    snapshotIndex = StartIndex;
+    snapshotTerm = StartTerm;
+
     commitIndex = 0;
     lastAppliedIndex = 0;
     nextIndex.resize(peers.size());
@@ -69,14 +74,17 @@ void Raft::Start(Op op, int64_t *logIndex, int64_t *logTerm, bool *isLeader) {
         *isLeader = false;
         return;
     }
+
     RaftNodeRpcProtoc::LogEntry logEntry;
-    logEntry.set_command(op.toString());
+    // todo op 持久化为 logEntry
+    logEntry.set_command(op.encodeToString());
     logEntry.set_logindex(getNextCommandIndex());
     logEntry.set_logterm(currentTerm);
     logs.emplace_back(logEntry);
+
     int64_t lastLogIndex = logEntry.logindex();
     std::string command = logEntry.command();
-    DPrintf("[func-Start-rf{%d}]  lastLogIndex:%d,command:%s\n", me, lastLogIndex, &command);
+    DPrintf("[func-Start-rf{%d}] lastLogIndex:%ld\n", me, lastLogIndex);
 
     persistRaftState();
     *logIndex = logEntry.logindex();

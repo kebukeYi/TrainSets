@@ -12,7 +12,7 @@
 StateMachine::StateMachine(const std::string &confPath) {
     std::string err;
     ServerConfig config;
-    if (load_config(confPath, config, err)) {
+    if (!load_config(confPath, config, err)) {
         printf("Load StateMachine config error: %s\n", err.c_str());
         return;
     }
@@ -24,7 +24,6 @@ StateMachine::~StateMachine() {
 }
 
 bool StateMachine::init() {
-    std::cout << "StateMachine init over" << std::endl;
     if (serverConfig.rdb_conf.enabled) {
         g_rdb.setConfig(serverConfig.rdb_conf);
         std::string err;
@@ -40,19 +39,19 @@ bool StateMachine::init() {
             std::cerr << "AOF init error: " << err << std::endl;
             return false;
         }
-        if (g_aof.load(this->g_store, err)) {
+        if (!g_aof.load(this->g_store, err)) {
             std::cerr << "AOF load error: " << err << std::endl;
             return false;
         }
     }
-
     return true;
 }
 
 StateMachine::Result StateMachine::Cmd(const std::string &cmd) {
     StateMachine::Result result;
-    auto null = respNullBulk();
-    result.Value = null;
+    auto respNull = respNullBulk();
+    result.Error="";
+    result.Value = respNull;
     respParser.append(cmd);
     auto maybe = respParser.tryParseOneWithRaw();
     if (!maybe.has_value()) {
@@ -64,7 +63,6 @@ StateMachine::Result StateMachine::Cmd(const std::string &cmd) {
     if (resp.empty()) {
         return result;
     }
-    respParser.clear();
     result.Value = resp;
     return result;
 }

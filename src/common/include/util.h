@@ -30,6 +30,8 @@ int64_t randInt63();
 
 std::chrono::milliseconds getRandomizedElectionTimeout();
 
+std::chrono::milliseconds getRandomizedReplicationTimeout();
+
 long long getRandomTimeout();
 
 void sleepForNMilliseconds(long long N);
@@ -100,14 +102,14 @@ public:
     std::string value;
     std::string err;
 public:
-    std::string toString() {
+    std::string encodeToString() {
         std::stringstream sa;
         boost::archive::text_oarchive oa(sa);
         oa << *this;
         return sa.str();
     }
 
-    bool parseFromString(const std::string &str) {
+    bool decodeFromString(const std::string &str) {
         std::stringstream sa(str);
         boost::archive::text_iarchive ia(sa);
         ia >> *this;
@@ -136,4 +138,5 @@ private:
 
 const std::string OK = "OK";
 const std::string ErrNoKey = "ErrNoKey";
+const std::string ErrTimeout = "ErrTimeout";
 const std::string ErrWrongLeader = "ErrWrongLeader";

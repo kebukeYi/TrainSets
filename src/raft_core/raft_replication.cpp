@@ -15,7 +15,7 @@ void Raft::replicationTicker() {
             mtx.lock();
             wakeTime = now();
             // 这一次的合适的 睡眠时间;
-            suitableSleepTime = getRandomizedElectionTimeout() + heartbeatResetTime - wakeTime;
+            suitableSleepTime = getRandomizedReplicationTimeout() + heartbeatResetTime - wakeTime;
             mtx.unlock();
         }
 
@@ -32,11 +32,11 @@ void Raft::replicationTicker() {
             std::chrono::duration<double, std::milli> duration = end - start;
 
             // 使用ANSI控制序列将输出颜色修改为紫色
-            std::cout << "\033[1;35m electionTimeOutTicker();函数设置睡眠时间为: "
+            std::cout << "\033[1;35m replicationTicker();函数设置睡眠时间为: "
                       << std::chrono::duration_cast<std::chrono::milliseconds>(suitableSleepTime).count()
                       << " 毫秒\033[0m"
                       << std::endl;
-            std::cout << "\033[1;35m electionTimeOutTicker();函数实际睡眠时间为: " << duration.count() << " 毫秒\033[0m"
+            std::cout << "\033[1;35m replicationTicker();函数实际睡眠时间为: " << duration.count() << " 毫秒\033[0m"
                       << std::endl;
         }
 
@@ -46,7 +46,7 @@ void Raft::replicationTicker() {
         }
 
         // 时间到了, 进行下发日志;
-        printf("[func-Raft::replicationTicker-raft{%d}] 时间到了, 进行下发日志;", me);
+        DPrintf("[replicationTicker-raft{%d}] 时间到了,进行下发日志;\n", me);
         doReplication();
     }
 };
@@ -58,8 +58,10 @@ void Raft::doReplication() {
         auto nodeNums = std::make_shared<int>(1);
         for (int i = 0; i < peers.size(); ++i) {
             if (i == me) {
+                // 逻辑上序列号;
                 nextIndex[i] = getLastLogIndex() + 1;
                 matchIndex[i] = getLastLogIndex();
+                continue;
             }
 
             int64_t prevLogIndex, prevLogTerm;
@@ -73,7 +75,6 @@ void Raft::doReplication() {
             }
 
             auto appendEntriesArgs = std::make_shared<RaftNodeRpcProtoc::AppendEntriesArgs>();
-            auto reply = std::make_shared<RaftNodeRpcProtoc::AppendEntriesReply>();
             appendEntriesArgs->set_leaderid(me);
             appendEntriesArgs->set_curterm(currentTerm);
             appendEntriesArgs->set_prevlogindex(prevLogIndex);
@@ -81,20 +82,38 @@ void Raft::doReplication() {
             appendEntriesArgs->set_leadercommitindex(commitIndex);
             appendEntriesArgs->clear_entries();
 
-            auto startIndex = getLogicLogIndex(prevLogIndex + 1);
-            for (int j = startIndex; j < logs.size(); ++j) {
-                RaftNodeRpcProtoc::LogEntry *entry = appendEntriesArgs->add_entries();
-                *entry = logs[j];
+            // logIndex: 120
+            // 快照:100
+            // 物理上: 20+1 = 21
+            // 逻辑上
+            // 物理上
+            // 逻辑区间: [prevLogIndex + 1, lastLogIndex]
+            auto maybeIndex = prevLogIndex + 1;
+            auto endLogIndex = getLastLogIndex();
+            DPrintf("[func-Raft::doReplication-raft{%d}] leader 向节点{%d}发送AE rpc 前, maybeIndex:{%ld}, endLogIndex:{%ld},log.size: %d",
+                    me, i, maybeIndex, endLogIndex, logs.size());
+            // 逻辑值 > 现存的逻辑值
+            if (maybeIndex > endLogIndex) {
+                DPrintf("[func-Raft::doReplication-raft{%d}] leader 不需要向节点{%d}发送AE rpc , maybeIndex:{%ld}, endLogIndex:{%ld},log.size: %d",
+                        me, i, maybeIndex, endLogIndex, logs.size());
+            } else {
+                auto startIndex = getRealLogIndex(maybeIndex);
+                for (int j = startIndex; j < logs.size(); ++j) {
+                    RaftNodeRpcProtoc::LogEntry *entry = appendEntriesArgs->add_entries();
+                    *entry = logs[j];
+                }
             }
 
-            int64_t lastLogIndex = getLastLogIndex();
             // leader对每个节点发送的日志长短不一，但是都保证从prevIndex发送直到最后
-            myAssert(appendEntriesArgs->prevlogindex() + appendEntriesArgs->entries_size() == lastLogIndex,
-                     format("appendEntriesArgs.PrevLogIndex{%d}+len(appendEntriesArgs.Entries){%ld} != lastLogIndex{%ld}",
-                            appendEntriesArgs->prevlogindex(), appendEntriesArgs->entries_size(), lastLogIndex));
+            myAssert(appendEntriesArgs->prevlogindex() + appendEntriesArgs->entries_size() == endLogIndex,
+                     format("appendEntriesArgs.PrevLogIndex{%d}+len(appendEntriesArgs.Entries){%ld} != endLogIndex{%ld}",
+                            appendEntriesArgs->prevlogindex(), appendEntriesArgs->entries_size(), endLogIndex));
 
-            DPrintf("[func-Raft::doReplication-raft{%d}] leader 向节点{%d}发送AE rpc，args->entries_size():{%d}", me, i,
-                    appendEntriesArgs->entries_size());
+            DPrintf("[func-Raft::doReplication-raft{%d}] leader 向节点{%d}发送AE rpc 中, args->entries_size():{%d}",
+                    me, i, appendEntriesArgs->entries_size());
+
+            auto reply = std::make_shared<RaftNodeRpcProtoc::AppendEntriesReply>();
+
             std::thread t1(&Raft::sendAppendEntries, this, i, appendEntriesArgs, reply, nodeNums);
             t1.detach();
         }
@@ -105,27 +124,29 @@ void Raft::doReplication() {
 bool Raft::sendAppendEntries(int server, std::shared_ptr<RaftNodeRpcProtoc::AppendEntriesArgs> args,
                              std::shared_ptr<RaftNodeRpcProtoc::AppendEntriesReply> reply,
                              std::shared_ptr<int> nodeNums) {
-
-    DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc開始 ， args->entries_size():{%d}", me,
-            server, args->entries_size());
-    auto status = peers[server]->CallAppendEntries(args.get(), reply.get());
+    auto peer = peers[server];
+    if (peer == nullptr) {
+        DPrintf("[func-Raft::sendAppendEntries-raft{%d}] peer{%d} is nullptr; exit;", me, server);
+        return false;
+    }
+    auto status = peer->CallAppendEntries(args.get(), reply.get());
     if (!status.ok()) {
         DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc失败", me, server);
         return false;
     }
 
     std::lock_guard<std::mutex> lock(mtx);
-    if (role != Raft::Leader) {
-        return false;
-    }
     if (reply->term() > currentTerm) {
         currentTerm = reply->term();
-        votedFor = -1;
         role = Raft::Follower;
+        votedFor = -1;
         persistRaftState();
         return false;
     }
 
+    if (role != Raft::Leader) {
+        return false;
+    }
     if (!reply->success()) {
         auto prevNextLogIndex = nextIndex[server];
         if (reply->term() == InvalidTerm) {
@@ -146,16 +167,16 @@ bool Raft::sendAppendEntries(int server, std::shared_ptr<RaftNodeRpcProtoc::Appe
         auto nextPrevLogIndex = nextIndex[server];
         auto nextPrevTerm = InvalidTerm;
         if (nextPrevLogIndex >= snapshotIndex) {
-            nextPrevTerm = logs[getLogicLogIndex(nextPrevLogIndex)].logterm();
+            nextPrevTerm = logs[getRealLogIndex(nextPrevLogIndex)].logterm();
         }
-        DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc失败，nextIndex{%d} -> {%d}", me,
-                server, nextPrevLogIndex, nextPrevTerm);
+        DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc not match, nextIndex{%ld} -> {%ld}",
+                me, server, nextPrevLogIndex, nextPrevTerm);
         return false;
-    } else {
-        DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc成功", me, server);
-        matchIndex[server] = std::max(matchIndex[server], args->prevlogindex() + args->entries_size());
-        nextIndex[server] = matchIndex[server] + 1;
     }
+
+    DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc成功", me, server);
+    matchIndex[server] = std::max(matchIndex[server], args->prevlogindex() + args->entries_size());
+    nextIndex[server] = matchIndex[server] + 1;
 
     auto majorityIndex = getMajorityIndexLocked();
     // leader 不能随便提交日志; 只能提交自己任期内的日志;
@@ -163,7 +184,7 @@ bool Raft::sendAppendEntries(int server, std::shared_ptr<RaftNodeRpcProtoc::Appe
         commitIndex = majorityIndex;
     }
     return true;
-};
+}
 
 int64_t Raft::getMajorityIndexLocked() {
     std::vector<int64_t> matchIndexCopy = matchIndex;
@@ -173,24 +194,22 @@ int64_t Raft::getMajorityIndexLocked() {
 
 grpc::Status Raft::AppendEntries(grpc::ServerContext *context, const RaftNodeRpcProtoc::AppendEntriesArgs *request,
                                  RaftNodeRpcProtoc::AppendEntriesReply *response) {
-
     std::lock_guard<std::mutex> lock(mtx);
     response->set_term(currentTerm);
     response->set_success(false);
+
     if (request->curterm() < currentTerm) {
         // 直接返回自己的大term;
         return grpc::Status::OK;
     }
 
-    if (request->curterm() > currentTerm) {
+    if (request->curterm() >= currentTerm) {
         role = Raft::Follower;
         currentTerm = request->curterm();
         votedFor = -1;
     }
-    //
-    role = Raft::Follower;
-    electionResetTime = now();
 
+    electionResetTime = now();
     // 0任期 size()索引
     if (request->prevlogindex() > getLastLogIndex()) {
         response->set_term(InvalidTerm); // 日志过短;
@@ -221,7 +240,7 @@ grpc::Status Raft::AppendEntries(grpc::ServerContext *context, const RaftNodeRpc
             } else {
                 // 有可能是重复的数据;
                 // index 相同，term 相同，command 不同;
-                auto logIndex = getLogicLogIndex(log.logindex());
+                auto logIndex = getRealLogIndex(log.logindex());
                 if (logs[logIndex].logterm() == log.logterm() && logs[logIndex].command() != log.command()) {
                     DPrintf("[func-Raft::AppendEntries-raft{%d}] follower 向leader{%d}发送AE rpc失败，日志重复",
                             me, request->leaderid());
@@ -243,18 +262,18 @@ grpc::Status Raft::AppendEntries(grpc::ServerContext *context, const RaftNodeRpc
         }
 
         myAssert(getLastLogIndex() >= request->prevlogindex() + request->entries_size(),
-                 format("[func-AppendEntries1-rf{%d}]rf.getLastLogIndex(){%d} != args.PrevLogIndex{%d}+len(args.Entries){%d}",
+                 format("[func-AppendEntries1-rf{%d}] rf.getLastLogIndex(){%ld} != args.PrevLogIndex{%ld}+len(args.Entries){%d}",
                         me, getLastLogIndex(), request->prevlogindex(), request->entries_size()));
 
-        electionResetTime = now();
         response->set_success(true);
     } else {
-        // 前一个 日志不匹配
-        auto confilictTerm = logs[getLogicLogIndex(request->prevlogindex())].logterm();
-        response->set_term(confilictTerm);
-        auto confilictIndex = getFirstLogIndex(confilictTerm);
-        response->set_nextindex(confilictIndex);
-        return grpc::Status::OK;
+        // 前一个 日志不匹配;
+        auto conflictTerm = logs[getRealLogIndex(request->prevlogindex())].logterm();
+        response->set_term(conflictTerm);
+        auto conflictIndex = getFirstLogIndex(conflictTerm);
+        response->set_nextindex(conflictIndex);
+        response->set_success(false);
     }
+    electionResetTime = now();
     return grpc::Status::OK;
 };

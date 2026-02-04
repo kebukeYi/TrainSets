@@ -75,11 +75,11 @@ void Raft::doElection() {
         ++currentTerm;
         votedFor = me;
         persistRaftState();
-        std::shared_ptr<int> votedNum = std::make_shared<int>(1);
+        std::shared_ptr<int> votedNum = std::make_shared<int>(0);
         electionResetTime = now();
-
         for (int i = 0; i < peers.size(); ++i) {
             if (i == me) {
+                (*votedNum)++;
                 continue;
             }
             DPrintf("[doElection().rf{%d}-term{%ld}] 向 server{%d} 发送 RequestVote", me, currentTerm, i);
@@ -91,6 +91,7 @@ void Raft::doElection() {
             args->set_lastlogindex(lastLogIndex);
             args->set_lastlogterm(lastLogTerm);
             auto reply = std::make_shared<RaftNodeRpcProtoc::RequestVoteReply>();
+            //
             std::thread t(&Raft::sendRequestVote, this, i, args, reply, votedNum);
             t.detach();
         }
@@ -98,17 +99,25 @@ void Raft::doElection() {
 };
 
 bool Raft::sendRequestVote(int server, std::shared_ptr<RaftNodeRpcProtoc::RequestVoteArgs> args,
-                           std::shared_ptr<RaftNodeRpcProtoc::RequestVoteReply> reply, std::shared_ptr<int> votedNum) {
+                           std::shared_ptr<RaftNodeRpcProtoc::RequestVoteReply> reply,
+                           std::shared_ptr<int> votedNum) {
     auto start = now();
-    auto status = peers[server]->CallRequestVote(args.get(), reply.get());
+    auto peer = peers[server];
+    if (peer == nullptr) {
+        DPrintf("[func-Raft::sendAppendEntries-raft{%d}] peer{%d} is nullptr; exit;", me, server);
+        return false;
+    }
+
+    auto status = peer->CallRequestVote(args.get(), reply.get());
 
     if (!status.ok()) {
-        DPrintf("[sendRequestVote-rf{%d}] 向 server{%d} 发送 RequestVote 失败; 原因:%s",
-                me, server, status.error_message().c_str());
-        sleep(3);
+        DPrintf("[sendRequestVote-rf{%d}] 向 server{%d} 发送 RequestVote 失败; 原因:%s", me, server,
+                status.error_message().c_str());
+        sleep(1);
+        return false;
     } else {
-        DPrintf("[sendRequestVote-rf{%d}] 向 server{%d} 发送 RequestVote 成功; 响应结果: %s, %s",
-                me, server, reply->term(), reply->votegranted());
+        DPrintf("[sendRequestVote-rf{%d}] 向 server{%d} 发送 RequestVote 成功; 响应结果: %ld, %d", me, server,
+                reply->term(), reply->votegranted());
     }
 
     std::lock_guard<std::mutex> lock(mtx);
@@ -126,11 +135,11 @@ bool Raft::sendRequestVote(int server, std::shared_ptr<RaftNodeRpcProtoc::Reques
 
     if (reply->votegranted()) {
         (*votedNum)++;
-        if (*votedNum > peers.size() / 2) {
+        if (*votedNum >= (peers.size() / 2 + 1)) {
             role = Raft::Leader;
             electionResetTime = now();
-            DPrintf("[func-sendRequestVote rf{%d}] 成为 Leader", me);
             auto lastLogIndex = getLastLogIndex();
+            DPrintf("[func-sendRequestVote rf{%d}] 成为 Leader, lastLogIndex: {%ld}", me, lastLogIndex);
             for (int i = 0; i < nextIndex.size(); ++i) {
                 nextIndex[i] = lastLogIndex + 1;
                 matchIndex[i] = 0;
@@ -145,6 +154,10 @@ bool Raft::sendRequestVote(int server, std::shared_ptr<RaftNodeRpcProtoc::Reques
 
 grpc::Status Raft::RequestVote(grpc::ServerContext *context, const RaftNodeRpcProtoc::RequestVoteArgs *request,
                                RaftNodeRpcProtoc::RequestVoteReply *response) {
+
+    DPrintf("[func--rf{%d}] 收到 RequestVote 请求; args.Term: {%ld}, args.CandidateId: {%d}, args.LastLogIndex: {%ld}, args.LastLogTerm: {%ld}",
+            me, request->term(), request->candidateid(), request->lastlogindex(), request->lastlogterm());
+
     std::lock_guard<std::mutex> lock(mtx);
     response->set_term(currentTerm);
     response->set_votegranted(false);

@@ -21,14 +21,14 @@ void Raft::applyTicker() {
 std::vector<ApplyMsg> Raft::getApplyMsgs() {
     std::vector<ApplyMsg> msgs;
     myAssert(commitIndex <= getLastLogIndex(),
-             format("[func- Raft::getApplyMsgs()-raft{%d}] commitIndex: {%d} > getLastLogIndex: {%d}", me, commitIndex,
-                    getLastLogIndex()));
+             format("[func- Raft::getApplyMsgs()-raft{%d}] commitIndex: {%d} > getLastLogIndex: {%d}",
+                    me, commitIndex,getLastLogIndex()));
     while (lastAppliedIndex < commitIndex) {
         lastAppliedIndex++;
         ApplyMsg applyMsg;
         applyMsg.SnapshotValid = false;
         applyMsg.CommandValid = true;
-        auto idx = getLogicLogIndex(lastAppliedIndex);
+        auto idx = getRealLogIndex(lastAppliedIndex);
         applyMsg.Command = logs[idx].command();
         applyMsg.CommandIndex = lastAppliedIndex;
         msgs.emplace_back(applyMsg);

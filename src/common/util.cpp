@@ -47,7 +47,11 @@ std::chrono::milliseconds getRandomizedElectionTimeout() {
     auto randRange = maxRandElectionTimeOut - minRandElectionTimeOut;
     auto timeout = std::chrono::milliseconds(minRandElectionTimeOut + randInt63() % randRange);
     return timeout + std::chrono::milliseconds(3000);
-};
+}
+
+std::chrono::milliseconds getRandomizedReplicationTimeout() {
+    return std::chrono::milliseconds(HeartBeatTimeOut + randInt63() % 1000);
+}
 
 long long getRandomTimeout() {
     static std::random_device rd;
