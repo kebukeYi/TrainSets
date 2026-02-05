@@ -13,16 +13,19 @@ grpc::Status ApplicationServer::Cmd(::grpc::ServerContext *context, const ::Appl
     int64_t raftIndex = -1;
     int64_t _ = -1;
     bool isLeader = false;
-    // 等待 raft commit 当前指令;
-    raft->Start(op, &raftIndex, &_, &isLeader);
-    if (!isLeader) {
-        response->set_err(ErrWrongLeader);
-        return grpc::Status::OK;
+
+    if (!IfRequestDuplicate(op.clientId, op.seqId)) {
+        // 等待 raft commit 当前指令;
+        raft->Start(op, &raftIndex, &_, &isLeader);
+        if (!isLeader) {
+            response->set_err(ErrWrongLeader);
+            return grpc::Status::OK;
+        }
     }
 
     mtx.lock();
-    if (waitApplyCh.find(raftIndex) == waitApplyCh.end()) {
-        waitApplyCh.insert(std::make_pair(raftIndex, new LockQueue<Op>()));
+    if (waitApplyCh.end() == waitApplyCh.find(raftIndex)) {
+        waitApplyCh[raftIndex] = new LockQueue<Op>();
     }
 
     auto chan = waitApplyCh[raftIndex];
@@ -30,15 +33,17 @@ grpc::Status ApplicationServer::Cmd(::grpc::ServerContext *context, const ::Appl
 
     Op opReply;
     if (!chan->timeOutPop(consensusTimeOut, &opReply)) {
-        printf("raftServer node:%d, raftIndex:%ld, seqId:%ld, clientId:%ld\n",
-               me, raftIndex, opReply.seqId, opReply.clientId);
+        printf("raftServer node:%d, raftIndex:%ld, seqId:%ld, clientId:%ld\n", me, raftIndex, opReply.seqId,
+               opReply.clientId);
         response->set_err(ErrTimeout);
+        return grpc::Status::OK;
     } else {
         if (!opReply.err.empty()) {
+            response->set_err(opReply.err);
+            return grpc::Status::OK;
+        } else {
             response->set_value(opReply.value);
             response->set_err(OK);
-        } else {
-            response->set_err(opReply.err);
         }
     }
 
@@ -55,6 +60,7 @@ ApplicationServer::ApplicationServer(int me, int64_t maxRaftState_, std::string 
                                      std::string &stateMachineConfPath) {
     std::shared_ptr<Persisted> persisted = std::make_shared<Persisted>(me);
     maxRaftState = maxRaftState_;
+    lastAppliedIndex = 0;
     isShutdown.store(false);
     applyChan = std::make_shared<LockQueue<ApplyMsg>>();
     raft = std::make_shared<Raft>();
@@ -139,10 +145,12 @@ ApplicationServer::ApplicationServer(int me, int64_t maxRaftState_, std::string 
 void ApplicationServer::ReadRaftCommandTicker() {
     while (!isShutdown.load()) {
         auto msg = applyChan->Pop();
-        DPrintf("--------tmp----[func-KvServer::ReadRaftApplyCommandLoop()-kvserver{%d}] 收到了下raft的消息", me);
+        DPrintf("[ApplicationServer::ReadRaftApplyCommandLoop()-kvServer{%d}] 收到了来自raft的消息", me);
         if (msg.CommandValid) {
+            DPrintf("[ApplicationServer::ReadRaftApplyCommandLoop()-kvServer{%d}] 收到了来自raft的命令", me);
             handleRaftCommand(msg);
         } else if (msg.SnapshotValid) {
+            DPrintf("[ApplicationServer::ReadRaftApplyCommandLoop()-kvServer{%d}] 收到了来自raft的快照", me);
             handleRaftSnapshot(msg);
         }
     }
@@ -152,17 +160,25 @@ void ApplicationServer::handleRaftCommand(ApplyMsg msg) {
     Op op;
     op.decodeFromString(msg.Command);
     if (msg.CommandIndex <= lastAppliedIndex) {
+        DPrintf("[ApplicationServer::handleRaftCommand()-kvServer{%d}] 收到的命令索引{%ld}小于等于lastAppliedIndex{%ld}",
+                me, msg.CommandIndex, lastAppliedIndex);
         return;
     }
     Op opReply;
-    if (!IfRequestDuplicate(op.clientId, op.seqId)) {
+    if (IfRequestDuplicate(op.clientId, op.seqId)) {
+        DPrintf("[ApplicationServer::IfRequestDuplicate-kvServer{%d}] 客户端{%ld}的请求{%ld}重复;",me, op.clientId, op.seqId);
+        auto resp = respSimpleString("OK");
+        opReply.value = resp;
+    } else {
+        lastAppliedIndex = msg.CommandIndex;
         // 执行到状态机中;
         executeCommand(op, &opReply);
+        // 是否需要持久化 raft 元信息;
+        if (maxRaftState != -1) {
+            IfNeedToSendSnapShotCommand(msg.CommandIndex, 9);
+        }
     }
-    // 是否需要持久化 raft 元信息;
-    if (maxRaftState != -1) {
-        IfNeedToSendSnapShotCommand(msg.CommandIndex, 9);
-    }
+
     // 发送给 client 通道;
     SendMessageToWaitChan(opReply, msg.CommandIndex);
 }
@@ -174,8 +190,7 @@ void ApplicationServer::executeCommand(Op &op, Op *opReply) {
     // 状态机执行;
     auto result = state_machine->Cmd(op.command);
     if (!result.Error.empty()) {
-        DPrintf("[func-application_server::executeCommand()-kvserver{%d}] 执行 raft 命令出错, 错误信息: %s", me,
-                result.Error.c_str());
+        DPrintf("[ApplicationServer::executeCommand-kvserver{%d}] 执行 raft 命令出错, 错误信息: %s", me,result.Error.c_str());
         opReply->err = result.Error;
         opReply->value = "";
         return;
@@ -183,14 +198,14 @@ void ApplicationServer::executeCommand(Op &op, Op *opReply) {
         opReply->value = result.Value;
         opReply->err = "";
     }
-    lastRequestId[op.clientId] = op.seqId; // 更新最后一个请求的 clientId 和 seqId
+    lastRequestId[op.clientId] = op.seqId; // 更新最后一个请求的 clientId 和 seqId;
 }
 
 bool ApplicationServer::SendMessageToWaitChan(Op &opReply, int64_t logIndex) {
     std::lock_guard<std::mutex> lock(mtx);
     auto it = waitApplyCh.find(logIndex);
     if (it == waitApplyCh.end()) {
-        return false;
+        waitApplyCh[logIndex] = new LockQueue<Op>();
     }
     waitApplyCh[logIndex]->Push(opReply);
     return true;

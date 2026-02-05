@@ -32,12 +32,11 @@ void Raft::replicationTicker() {
             std::chrono::duration<double, std::milli> duration = end - start;
 
             // 使用ANSI控制序列将输出颜色修改为紫色
-            std::cout << "\033[1;35m replicationTicker();函数设置睡眠时间为: "
-                      << std::chrono::duration_cast<std::chrono::milliseconds>(suitableSleepTime).count()
-                      << " 毫秒\033[0m"
-                      << std::endl;
-            std::cout << "\033[1;35m replicationTicker();函数实际睡眠时间为: " << duration.count() << " 毫秒\033[0m"
-                      << std::endl;
+//            std::cout << "\033[1;35m replicationTicker();函数设置睡眠时间为: "
+//                      << std::chrono::duration_cast<std::chrono::milliseconds>(suitableSleepTime).count()
+//                      << " 毫秒\033[0m"
+//                      << std::endl;
+//            std::cout << "\033[1;35m replicationTicker();函数实际睡眠时间为: " << duration.count() << " 毫秒\033[0m" << std::endl;
         }
 
         if (std::chrono::duration<double, std::milli>(heartbeatResetTime - wakeTime).count() > 0) {
@@ -46,7 +45,7 @@ void Raft::replicationTicker() {
         }
 
         // 时间到了, 进行下发日志;
-        DPrintf("[replicationTicker-raft{%d}] 时间到了,进行下发日志;\n", me);
+        //DPrintf("[replicationTicker-raft{%d}] 时间到了,进行下发日志;\n", me);
         doReplication();
     }
 };
@@ -90,12 +89,10 @@ void Raft::doReplication() {
             // 逻辑区间: [prevLogIndex + 1, lastLogIndex]
             auto maybeIndex = prevLogIndex + 1;
             auto endLogIndex = getLastLogIndex();
-            DPrintf("[func-Raft::doReplication-raft{%d}] leader 向节点{%d}发送AE rpc 前, maybeIndex:{%ld}, endLogIndex:{%ld},log.size: %d",
-                    me, i, maybeIndex, endLogIndex, logs.size());
+            // DPrintf("[func-Raft::doReplication-raft{%d}] leader 向节点{%d}发送AE rpc 前, maybeIndex:{%ld}, endLogIndex:{%ld},log.size: %d",me, i, maybeIndex, endLogIndex, logs.size());
             // 逻辑值 > 现存的逻辑值
             if (maybeIndex > endLogIndex) {
-                DPrintf("[func-Raft::doReplication-raft{%d}] leader 不需要向节点{%d}发送AE rpc , maybeIndex:{%ld}, endLogIndex:{%ld},log.size: %d",
-                        me, i, maybeIndex, endLogIndex, logs.size());
+            // DPrintf("[func-Raft::doReplication-raft{%d}] leader 不需要向节点{%d}发送AE rpc , maybeIndex:{%ld}, endLogIndex:{%ld},log.size: %d",me, i, maybeIndex, endLogIndex, logs.size());
             } else {
                 auto startIndex = getRealLogIndex(maybeIndex);
                 for (int j = startIndex; j < logs.size(); ++j) {
@@ -109,11 +106,11 @@ void Raft::doReplication() {
                      format("appendEntriesArgs.PrevLogIndex{%d}+len(appendEntriesArgs.Entries){%ld} != endLogIndex{%ld}",
                             appendEntriesArgs->prevlogindex(), appendEntriesArgs->entries_size(), endLogIndex));
 
-            DPrintf("[func-Raft::doReplication-raft{%d}] leader 向节点{%d}发送AE rpc 中, args->entries_size():{%d}",
-                    me, i, appendEntriesArgs->entries_size());
+            if (appendEntriesArgs->entries_size() > 0){
+                DPrintf("[func-Raft::doReplication-raft{%d}] leader 向节点{%d}发送AE rpc 中, args->entries_size():{%d}",me, i, appendEntriesArgs->entries_size());
+            }
 
             auto reply = std::make_shared<RaftNodeRpcProtoc::AppendEntriesReply>();
-
             std::thread t1(&Raft::sendAppendEntries, this, i, appendEntriesArgs, reply, nodeNums);
             t1.detach();
         }
@@ -174,13 +171,15 @@ bool Raft::sendAppendEntries(int server, std::shared_ptr<RaftNodeRpcProtoc::Appe
         return false;
     }
 
-    DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc成功", me, server);
+    // DPrintf("[func-Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc成功", me, server);
+    // 如果发送成功, 但是follower节点并没有把 log[]应用到状态机中, 这该怎么办?
     matchIndex[server] = std::max(matchIndex[server], args->prevlogindex() + args->entries_size());
     nextIndex[server] = matchIndex[server] + 1;
 
     auto majorityIndex = getMajorityIndexLocked();
     // leader 不能随便提交日志; 只能提交自己任期内的日志;
     if (majorityIndex > commitIndex && logs[majorityIndex].logterm() == currentTerm) {
+        DPrintf("[Raft::sendAppendEntries-raft{%d}] leader 向节点{%d}发送AE rpc成功, 更新majorityIndex{%ld}", me, server, majorityIndex);
         commitIndex = majorityIndex;
     }
     return true;
@@ -233,10 +232,12 @@ grpc::Status Raft::AppendEntries(grpc::ServerContext *context, const RaftNodeRpc
         // 1.follower如何处理?
         // 2.如何给leader回复?
         // 3. leader如何处理?
+        std::string logsIDs;
         for (int i = 0; i < request->entries_size(); ++i) {
             auto log = request->entries(i);
             if (log.logindex() > getLastLogIndex()) {
                 logs.push_back(log);
+                logsIDs += std::to_string(log.logindex()) + " , ";
             } else {
                 // 有可能是重复的数据;
                 // index 相同，term 相同，command 不同;
@@ -258,6 +259,8 @@ grpc::Status Raft::AppendEntries(grpc::ServerContext *context, const RaftNodeRpc
         }
 
         if (request->leadercommitindex() > commitIndex) {
+            DPrintf("[Raft::AppendEntries-raft{%d}] follower 保存 leader{%d}发送的AE, leader.CommitIndex{%ld}",
+                    me, request->leaderid(), request->leadercommitindex());
             commitIndex = std::min(request->leadercommitindex(), getLastLogIndex());
         }
 
@@ -265,6 +268,10 @@ grpc::Status Raft::AppendEntries(grpc::ServerContext *context, const RaftNodeRpc
                  format("[func-AppendEntries1-rf{%d}] rf.getLastLogIndex(){%ld} != args.PrevLogIndex{%ld}+len(args.Entries){%d}",
                         me, getLastLogIndex(), request->prevlogindex(), request->entries_size()));
 
+        if (request->entries_size() > 0) {
+            DPrintf("[Raft::AppendEntries-raft{%d}] follower 保存 leader{%d}发送的AE(%s),size: %ld",
+                    me, request->leaderid(), logsIDs.c_str(), request->entries_size());
+        }
         response->set_success(true);
     } else {
         // 前一个 日志不匹配;

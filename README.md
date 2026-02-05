@@ -6,9 +6,15 @@ protoc --cpp_out=. --grpc_out=. --plugin=protoc-gen-grpc=`which grpc_cpp_plugin`
 
 mkdir build && cd build && rm -rf * && cmake .. && make -j 4
 
-./example_raft_server -n 3 -f ../conf/raft_node.conf -m ../conf/everysec.conf
+clear && rm -rf * && cmake .. && make -j 4
 
-./example_raft_client -f ../conf/raft_node.conf
+clear && ./example_raft_server -n 3 -f ../conf/raft_node.conf -m ../conf/everysec.conf
+
+clear && ./example_raft_server -i 0 -f ../conf/raft_node.conf -m ../conf/everysec.conf
+clear && ./example_raft_server -i 1 -f ../conf/raft_node.conf -m ../conf/everysec.conf
+clear && ./example_raft_server -i 2 -f ../conf/raft_node.conf -m ../conf/everysec.conf
+
+clear && ./example_raft_client -f ../conf/raft_node.conf
 
 
 lsof -t -i:27899,27900,27901
@@ -36,7 +42,6 @@ g++ -g -O0 -o myprogram myprogram.cpp
 cmake -DCMAKE_BUILD_TYPE=Debug ..
 # 或者在 CMakeLists.txt 中添加
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
-
 
 # 基本用法
 gdb ./example_raft_server core.12345

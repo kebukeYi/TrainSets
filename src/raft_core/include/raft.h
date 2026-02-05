@@ -33,8 +33,8 @@ private:
     int64_t snapshotIndex;
     int64_t snapshotTerm;
 
-    int64_t commitIndex;
-    int64_t lastAppliedIndex;
+    int64_t commitIndex; // 逻辑序列号
+    int64_t lastAppliedIndex; // 逻辑序列号
     std::vector<int64_t> nextIndex; // 逻辑序列号
     std::vector<int64_t> matchIndex;
     enum Role {
@@ -72,9 +72,9 @@ private:
     };
 
 public:
-    Raft()=default;
+    Raft() = default;
 
-    ~Raft()=default;
+    ~Raft() = default;
 
     void init(int me, std::vector<std::shared_ptr<RaftNodeRpcUtil>> peers, std::shared_ptr<Persisted> persist,
               std::shared_ptr<LockQueue<ApplyMsg>> applyChan);
@@ -140,7 +140,7 @@ public:
 
     int64_t getRealLogIndex(int64_t logIndex);
 
-    int64_t  getTailLogIndex(int64_t logIndex);
+    int64_t getTailLogIndex(int64_t logIndex);
 
     int64_t getMajorityIndexLocked();
 

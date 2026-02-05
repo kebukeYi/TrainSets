@@ -15,7 +15,7 @@ const int ApplyInterval = 25 * debugMul;
 const int minRandElectionTimeOut = 250 * debugMul;
 const int maxRandElectionTimeOut = 400 * debugMul;
 
-const int consensusTimeOut = 55 * debugMul;
+const int consensusTimeOut = 1500 * debugMul;
 
 const int fiberThreadPoolSize = 3;
 const bool fiberUseCallerThread = false;

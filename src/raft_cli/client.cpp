@@ -79,14 +79,14 @@ std::string Client::Cmd(std::string &raw, std::string &command) {
         grpc::Status status = peer->CallCmd(request, response);
 
         if (!status.ok()) {
-            printf("【Client::Cmd】CallCmd {%ld}请求失败, 4秒后重试; 错误原因:{%s}\n", server,
-                   status.error_message().c_str());
-            sleep(4);
+            DPrintf("【Client::Cmd】向node-{%ld}的{%s}请求失败,4秒后重试; 错误原因:{%s};",
+                    server, raw.c_str(), status.error_message().c_str());
+            sleep(3);
             continue;
         }
 
         if (response.err() == ErrWrongLeader) {
-            DPrintf("【Client::Cmd】原以为的leader:{%d}请求失败, 3秒后向新node{%d}重试;", server, server + 1);
+            DPrintf("【Client::Cmd】向node-{%d}的{%s}请求失败,3秒后向新node-{%d}重试;", server, raw.c_str(), server + 1);
             server++;
             server = static_cast<int64_t >(server % static_cast<int64_t >(servers.size()));
             sleep(3);
@@ -94,7 +94,7 @@ std::string Client::Cmd(std::string &raw, std::string &command) {
         }
 
         if (response.err() == ErrTimeout) {
-            DPrintf("【Client::Cmd】请求leader{%d}超时, 3秒后重试, command:%s ", server, raw.c_str());
+            DPrintf("【Client::Cmd】向leader-{%ld}的{%s}请求超时,3秒后重试;", server, raw.c_str());
             sleep(3);
             continue;
         }
@@ -102,10 +102,11 @@ std::string Client::Cmd(std::string &raw, std::string &command) {
         if (response.err() == OK) {
             leaderId = server;
             auto res = parseResp(const_cast<std::string &>(response.value()));
-            DPrintf("【Client::Cmd】请求成功, 返回值：{%s}", res.c_str());
+            DPrintf("【Client::Cmd】向leader-{%ld}的{%s}请求成功,返回值:{%s}", server, raw.c_str(), res.c_str());
             return res;
         } else {
-            DPrintf("【Client::Cmd】请求leader{%d}失败, 错误原因：{%s}", server, response.err().c_str());
+            DPrintf("【Client::Cmd】向leader-{%ld}的{%s}请求失败,错误原因：{%s}", server, raw.c_str(),
+                    response.err().c_str());
             return "";
         }
     }

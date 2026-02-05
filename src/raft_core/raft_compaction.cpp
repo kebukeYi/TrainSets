@@ -89,10 +89,11 @@ grpc::Status Raft::InstallSnapshot(grpc::ServerContext *context, const RaftNodeR
     msg.Snapshot = request->snapshot();
     msg.SnapshotIndex = snapshotIndex;
     msg.SnapshotTerm = snapshotTerm;
+    // 快照数据单独存放, 不和log[]共同存放;
     std::thread t(&Raft::doApply, this, msg);
     t.detach();
-    auto data = doPersistRaftState();
 
+    auto data = doPersistRaftState();
     persist_->Save(data, msg.Snapshot);
     return grpc::Status::OK;
 };

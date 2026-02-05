@@ -45,6 +45,7 @@ void Raft::init(int me, std::vector<std::shared_ptr<RaftNodeRpcUtil>> peers,
     readPersistRaftState(data);
     printf("RaftNode-%d LoadRaftState.over: term %ld, votedFor %ld, logs.size: %ld, snapshotIndex %ld, snapshotTerm %ld, commitIndex %ld, lastAppliedIndex %ld\n",
            me, currentTerm, votedFor, logs.size(), snapshotIndex, snapshotTerm, commitIndex, lastAppliedIndex);
+
     if (snapshotIndex > 0) {
         lastAppliedIndex = snapshotIndex;
     }
@@ -61,7 +62,7 @@ void Raft::init(int me, std::vector<std::shared_ptr<RaftNodeRpcUtil>> peers,
         replicationTicker();
     });
 
-    printf("RaftNode-%d start applyTicker \n", me);
+    printf("RaftNode-%d start applyTicker.... \n", me);
     std::thread t3(&Raft::applyTicker, this);
     t3.detach();
 }
@@ -74,7 +75,7 @@ void Raft::Start(Op op, int64_t *logIndex, int64_t *logTerm, bool *isLeader) {
         *isLeader = false;
         return;
     }
-
+    std::lock_guard<std::mutex> lock(mtx);
     RaftNodeRpcProtoc::LogEntry logEntry;
     // todo op 持久化为 logEntry
     logEntry.set_command(op.encodeToString());
